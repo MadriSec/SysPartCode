@@ -1,13 +1,6 @@
-### Build test binaries
+### Build and run tests 
 
 ```
 make
 ```
 
-### Run Tests
-
-```
-# chmod +x hello*/test.sh
-# chmod +x run_all_tests.sh
-./run_all_tests.sh
-```
