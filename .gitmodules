@@ -1,4 +1,5 @@
 [submodule "analysis/tools/egalito"]
 	path = analysis/tools/egalito
 	url = git@gitlab.com:madrisec/egalito.git
-	branch = metis-main-syspart
+	branch = debian-bookworm
+
