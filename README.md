@@ -32,8 +32,8 @@ To set up the project, please refer to the instructions in the [setup guide](./d
 
 ## 🔍 Using the tool
 
-For usage, please refer to the [usage guide](.docs/usage.md).
+For usage, please refer to the [usage guide](./docs/usage.md).
 
 ## 🚨 Errors
 
-If having errors while building, you can check our [error log](.docs/errors.md)
+If having errors while building, you can check our [error log](./docs/errors.md)
