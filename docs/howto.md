@@ -24,8 +24,8 @@ Good ideas how to make this more readable are welcome.  Lets try to add informat
      Total syscalls of __stdout_write : 2    // How many syscalls are called
      
      Direct : stdout_write : ioctl           // Syscalls that are directly called by the function
-     Derived : stdout_write : writev         // Syscalls that are ???
-     Total : stdout_write : ioctl writev     // Direct and Derived
+     Derived : stdout_write : writev         // Syscalls that are reachable through invoked functions
+     Total : stdout_write : ioctl writev     // Direct + Derived
      16,20,                                  // Syscall numbers for each in Total
      ```
 
