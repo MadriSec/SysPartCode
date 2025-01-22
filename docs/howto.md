@@ -18,6 +18,7 @@ Good ideas how to make this more readable are welcome.  Lets try to add informat
 5. Prints AICT (Average Indirect call target)
 6. Prints the possible values of argument passed to a function (args : func_name, register_id)
 7. Prints the system call info of all functions or of a specific function(args : func_name or * (for all fns))
+   - AT functions are included.
    - Example: ```shell syspart -p <binary> -s main -a 7,*```
    - Outputs results per function, e.g.:
      ```shell
