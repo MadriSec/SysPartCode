@@ -1,9 +1,8 @@
 # SysPart Howto
+**Lets try to add information for all -a options, like in case seven below.**
 
 | Flag            | Explanation |
 |:---------------:|-------------|
-| | Good ideas how to make this more readable are welcome.  Lets try to add information for all -a options, like in case seven below. |
-| |
 | 'p', "PROG"     | The binary program to be analyzed |
 | 's', "STARTFN"  | Name or address of the root function of the function call graph (usually main). Address should start with 0x |
 | 't', "PATH"     | To enable typearmor. PATH refers to the path to the typearmor output file |
