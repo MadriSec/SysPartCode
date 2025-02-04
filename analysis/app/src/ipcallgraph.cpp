@@ -1993,6 +1993,10 @@ void IPCallGraph::resolveNss(ConductorSetup* setup) {
 		for (auto needed : libneeded) 
 		{
 			std::string soname = "libnss_" + needed.first + ".so.2";	//ext_sym_name is found in nss library soname
+			std::string lib_path = edyn.findSharedObject(soname);
+			if (lib_path == ""){
+				continue;
+			}
         	edyn.addDependency(libc, soname);
         	setup->getConductor()->parseLibraries();
         	auto library = program->getLibraryList()->find(soname);
