@@ -7,6 +7,7 @@
 #include <memory>
 #include <algorithm>
 #include <iostream>
+#include <deque>
 
 #include "instr/linked-x86_64.h"
 #include "conductor/setup.h"
