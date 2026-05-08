@@ -9,7 +9,7 @@ We update this repository to add more features and fix bugs. In case of any quer
 
 ## Upgrades and fixes
 **⚡ LATEST UPDATE (SCALABLE TOOL WITH NEWER OPTIONS)!! ⚡**
-We have introduced new features, including improved scalability to handle larger binaries more efficiently, as well as added scripts that simplify and accelerate the analysis process. For more information, please see the sections [build new features](#build-new-features) and [run new features and options](#run-new-features-and-options).
+We have introduced new features, including improved scalability to handle larger binaries more efficiently, as well as added scripts that simplify and accelerate the analysis process. For more information, please see the section [run new features and options](#run-new-features-and-options).
 
 **⚡ UPGRADE TO LATEST OS!! ⚡**
 We have upgraded SysPart for use in latest ubuntu versions. (ubuntu 18.04+). We have tested in ubuntu 22.04. Please find more info about how to upgrade in the section [run in latest OS versions](#in-latest-os-versions).
@@ -47,7 +47,7 @@ This repository uses several git submodules for benchmarking. To clone this repo
 Once you ensure your public  keys are configured, you an clone the repository recursively with:
 
 ```
-git clone --recursive https://github.com/vidyalakshmir/SysPartCode.git
+git clone --recursive https://github.com/MadriSec/SysPartCode.git
 ```
 
 ### Install all dependencies
@@ -56,13 +56,6 @@ git clone --recursive https://github.com/vidyalakshmir/SysPartCode.git
 sudo apt-get install make g++ libreadline-dev gdb lsb-release unzip libc6-dbg libstdc++6-7-dbg
 
 sudo apt install libunwind-dev python3
-```
-
-### Build new features
-If you want to use the newly added features of the tool including scalability updates and other additional features, please checkout the following git branch
-
-```
-git checkout new-features
 ```
 
 ### Building the tool 
@@ -82,7 +75,7 @@ The initial repo was tested in ubuntu 18.04. We have upgraded it to work on late
 ### Run new features and options
 **To generate callgraph and compute system calls of a binary**
 
-Please make sure you are on the `new-features` branch of the git repository and have build it correctly. 
+Please make sure you have built it correctly.
 
 In order to obtain the system calls of a ELF binary and its dependent libraries reachable from a list of system calls, use the following command
 
