@@ -100,6 +100,7 @@ class Syspart
 		int isNonReturn(ControlFlowGraph *cfg, Block* bl, set<Block*> visited);
 
 		//Methods that implement experimental analysis
+		void run_fcg_with_argument_resolution(bool direct, bool icanalysisFlag, bool typearmorFlag, string function1, string function2, int reg1, int reg2, char*filename);
 		void run1(bool direct, bool icanalysisFlag, bool typearmorFlag);
 		
 		void run2(bool direct, bool icanalysisFlag, bool typearmorFlag, string func_name="*");
