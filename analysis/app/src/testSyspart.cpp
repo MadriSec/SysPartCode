@@ -31,7 +31,6 @@ string option_args;
 bool option_flag = false;
 bool allFlag = false;
 
-<<<<<<< HEAD
 static int parse_opt (int key, char *arg, struct argp_state *state) 
 { 
     switch (key) 
@@ -87,56 +86,6 @@ static int parse_opt (int key, char *arg, struct argp_state *state)
                      option = stoi(option_args,nullptr,10);
                    }
                    
-=======
-static int parse_opt(int key, char *arg, struct argp_state *state)
-{
-    switch (key)
-    {
-    case 'p':
-        filename = arg;
-        break;
-    case 's':
-        if (arg[0] == '0' && arg[1] == 'x')
-        {
-            func_addr = arg;
-        }
-        else
-        {
-            isAddr = false;
-            func_name = arg;
-        }
-        funcFlag = true;
-        break;
-    case 't':
-        typearmorFlag = true;
-        typearmorPath = arg;
-
-        break;
-    case 'i':
-        icanalysisFlag = true;
-
-        break;
-    case 'l':
-        log_flag = true;
-
-        break;
-    case 'g':
-        direct_flag = true;
-
-        break;
-    case 'a':
-        option_flag = true;
-        option_args = arg;
-        auto found = option_args.find(',');
-        if (found != string::npos)
-        {
-            option = stoi(option_args.substr(0, found + 1), nullptr, 10);
-        }
-        else
-        {
-            option = stoi(option_args, nullptr, 10);
-        }
->>>>>>> origin/experimental
     }
     return 0;
 }
@@ -174,7 +123,6 @@ int main(int argc, char *argv[])
       19. Prints if fork() and pthread() functions are invoked within the application \n \
       20. Print all functions of all modules \n \
       21. Prints the arguments to dlopen()  \n \
-<<<<<<< HEAD
       22. Prints the arguments to dlsym() \n \
       23. Prints the callgraph from a set of start functions which are stored in a file and passed as argument to -s option \n \
       24. Prints the direct syscalls \n \
@@ -188,13 +136,6 @@ int main(int argc, char *argv[])
     struct argp argp = { options, parse_opt };  
     argp_parse (&argp, argc, argv, 0, 0, 0);
     if(filename == NULL)
-=======
-      22. Prints the arguments to dlsym()"},
-         {0}};
-    struct argp argp = {options, parse_opt};
-    argp_parse(&argp, argc, argv, 0, 0, 0);
-    if (filename == NULL)
->>>>>>> origin/experimental
     {
         cout << "Binary program should be provided" << endl;
         return -1;
@@ -223,7 +164,6 @@ int main(int argc, char *argv[])
 
     CollapsePLTPass collapsePLT(egalito.getConductor());
     prog->accept(&collapsePLT);
-<<<<<<< HEAD
     sp.populateSyscallMap(); 
 	Function *start_func = NULL;
 	if(isFile)
@@ -243,23 +183,6 @@ int main(int argc, char *argv[])
 	}
 	if(typearmorFlag)
 		sp.setTypeArmorPath(typearmorPath);
-    switch(option)
-=======
-
-    Function *start_func = NULL;
-    if (!isAddr)
->>>>>>> origin/experimental
-    {
-        start_func = sp.findFunctionByName(func_name);
-    }
-    else
-    {
-        address_t address = (address_t)strtol(func_addr, NULL, 16);
-        start_func = sp.findFunctionByAddress(address);
-    }
-    sp.setStartFunc(start_func);
-    if (typearmorFlag)
-        sp.setTypeArmorPath(typearmorPath);
     switch (option)
     {
     case 1:
@@ -549,7 +472,36 @@ int main(int argc, char *argv[])
                 m = module;
                 // break;
             }
-<<<<<<< HEAD
+             cout << module_name << endl;
+        }
+        if (m == NULL)
+        {
+            cout << "No module with the specified name found" << endl;
+        }
+        else
+        {
+            cout << "Module found " << m->getName() << endl;
+            sp.findCallGraphOfModule(m);
+        }
+        break;
+    }
+    case 18:
+    {
+        auto found = option_args.find(',');
+        if (found == string::npos)
+        {
+            cout << "Args(func_name) required" << endl;
+            break;
+        }
+        string func_name = option_args.substr(found + 1);
+        sp.getPartitionSize(direct_flag, icanalysisFlag, typearmorFlag, func_name);
+        break;
+    }
+    case 19:
+        {
+        sp.run6(direct_flag, icanalysisFlag, typearmorFlag);
+        break;
+        }
 	case 20 :
 	    {
 		sp.printFunctions();
@@ -602,61 +554,6 @@ int main(int argc, char *argv[])
 		    sp.run16(direct_flag, icanalysisFlag, typearmorFlag, 2);
 		    break;
 	    }
-        default : {
-                    cout<<"\nInvalid option"<<endl;
-                    break;
-                  }
-    }       
-
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<seconds>(stop - start); 
-    std::cerr << "Time taken for the analysis: "<<std::dec<<duration.count() <<" seconds" << endl; 
-=======
-            cout << module_name << endl;
-        }
-        if (m == NULL)
-        {
-            cout << "No module with the specified name found" << endl;
-        }
-        else
-        {
-            cout << "Module found " << m->getName() << endl;
-            sp.findCallGraphOfModule(m);
-        }
-        break;
-    }
-    case 18:
-    {
-        auto found = option_args.find(',');
-        if (found == string::npos)
-        {
-            cout << "Args(func_name) required" << endl;
-            break;
-        }
-        string func_name = option_args.substr(found + 1);
-        sp.getPartitionSize(direct_flag, icanalysisFlag, typearmorFlag, func_name);
-        break;
-    }
-    case 19:
-    {
-        sp.run6(direct_flag, icanalysisFlag, typearmorFlag);
-        break;
-    }
-    case 20:
-    {
-        sp.printFunctions();
-        break;
-    }
-    case 21:
-    {
-        sp.printDlArgs("dlopen@");
-        break;
-    }
-    case 22:
-    {
-        sp.printDlArgs("dlsym@");
-        break;
-    }
     case 100:
     {
         vector<string> tokens;
@@ -693,11 +590,11 @@ int main(int argc, char *argv[])
         cout << "\nInvalid option" << endl;
         break;
     }
-    }
+
+    }       
 
     auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<seconds>(stop - start);
-    // cout << "Time taken for the analysis: "<<std::dec<<duration.count() <<" seconds" << endl;
->>>>>>> origin/experimental
+    auto duration = duration_cast<seconds>(stop - start); 
+    std::cerr << "Time taken for the analysis: "<<std::dec<<duration.count() <<" seconds" << endl; 
     return 0;
 }

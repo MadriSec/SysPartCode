@@ -1526,11 +1526,11 @@ void Syspart::run_fcg_with_argument_resolution(bool direct, bool icanalysisFlag,
     cout<<"ARGUMENTRES-BEGIN-FUNC1"<<endl;
     SyspartUtility util(program, &ip_callgraph, 0);
     util.initialize();
-    vector<UDResult> res1;
+    std::unordered_set<UDResult> res1;
     util.getArgumentsPassedToFunction(func1, reg1, res1);    
 
     cout<<"ARGUMENTRES-BEGIN-FUNC2"<<endl;
-    vector<UDResult> res2;
+    std::unordered_set<UDResult> res2;
     util.getArgumentsPassedToFunction(func2, reg2, res2);
 }
 
