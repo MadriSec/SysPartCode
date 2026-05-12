@@ -1492,6 +1492,48 @@ void Syspart::getDirectSyscalls()
 
 }
 
+void Syspart::run_fcg_with_argument_resolution(bool direct, bool icanalysisFlag, bool typearmorFlag, string function1, string function2, int reg1, int reg2, char*filename)
+{
+    auto func1 = findFunctionByName(function1);
+    if(func1 == NULL)
+    {
+	    cout<<"Function with name "<<function1<<" not found"<<endl;
+	    return;
+    }
+    auto func2 = findFunctionByName(function2);
+    if(func2==NULL){
+        cout<<"Function with name "<<function2<<" not found"<<endl;
+	    return;
+    }
+    ip_callgraph.setProgram(program);
+    ip_callgraph.setRoot(start_func);
+    ip_callgraph.resolveNss(setup);
+    ip_callgraph.setIcanalysis(icanalysisFlag);
+    ip_callgraph.setTypeArmor(typearmorFlag);
+    if(typearmorFlag)
+        ip_callgraph.setTypeArmorPath(typearmorPath);
+    if(direct)
+        ip_callgraph.generateDirectCallGraph();
+    else
+       ip_callgraph.generate();
+    ip_callgraph.addNssEdges();
+    finiFuncs = ip_callgraph.getFiniFuncs();
+    initFuncs = ip_callgraph.getInitFuncs();
+    ip_callgraph.printCallGraphWithCallsites();
+    //ip_callgraph.printCallGraph();
+    //ip_callgraph.printCallGraphofApplication();
+    //ip_callgraph.printDirectEdges();
+    cout<<"ARGUMENTRES-BEGIN-FUNC1"<<endl;
+    SyspartUtility util(program, &ip_callgraph, 0);
+    util.initialize();
+    vector<UDResult> res1;
+    util.getArgumentsPassedToFunction(func1, reg1, res1);    
+
+    cout<<"ARGUMENTRES-BEGIN-FUNC2"<<endl;
+    vector<UDResult> res2;
+    util.getArgumentsPassedToFunction(func2, reg2, res2);
+}
+
 /**** PRINT CALLGRAPH ********/
 void Syspart::run1(bool direct, bool icanalysisFlag, bool typearmorFlag)
 {
