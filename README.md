@@ -13,11 +13,14 @@ We have introduced new features, including improved scalability to handle larger
 
 **⚡ UPGRADE TO LATEST OS!! ⚡**
 We have upgraded SysPart for use in latest ubuntu versions. (ubuntu 18.04+). We have tested in ubuntu 22.04. Please find more info about how to upgrade in the section [run in latest OS versions](#in-latest-os-versions).
+We have tested on : Debian 13 (trixie); Debian 12 (bookworm); Ubuntu (22.04 LTS); Ubuntu (24.04 LTS)
+
+
 
 ## Basic Requirements
 - Works on **linux binaries (ELF)** which run on **x86-64** architecture
 - Tested with **ELF binaries with symbols** (application as well as libraries). It will work with stripped binaries, only that the results (like callgraph) might be overapproximated.
-- The tool was initially tested on **Ubuntu 18.04** and currently we have upgraded to later versions having been tested in ubuntu 22.04. Refer [run in latest OS versions](#in-latest-os-versions) to upgrade the repo for the latest ubuntu.
+- The tool was initially tested on **Ubuntu 18.04** and currently we have upgraded to later versions. Refer [run in latest OS versions](#in-latest-os-versions) to upgrade the repo for the latest ubuntu.
 
 ## Capabilities of the tool
 ### Any application
@@ -47,7 +50,10 @@ This repository uses several git submodules for benchmarking. To clone this repo
 Once you ensure your public  keys are configured, you an clone the repository recursively with:
 
 ```
-git clone --recursive https://github.com/MadriSec/SysPartCode.git
+git clone https://github.com/MadriSec/SysPartCode.git
+cd SysPartCode
+git checkout syspart-wogramma
+git submodule update --init --recursive
 ```
 
 ### Install all dependencies
