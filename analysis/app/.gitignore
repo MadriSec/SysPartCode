@@ -2,3 +2,5 @@ analysis/app/.symlinks
 analysis/app/build_x86_64/
 analysis/app/loops
 analysis/app/syspart
+src/dlanalysis/all_libs.txt
+src/dlanalysis/unique_libs.txt
