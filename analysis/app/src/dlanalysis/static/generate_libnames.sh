@@ -6,7 +6,7 @@ file1="$script_dir/../all_libs.txt"
 rm -f $file1
 while IFS= read -r line
 do
-	sudo find $line | grep '\.so$' >> $file1
+	find "$line" -type f 2>/dev/null | grep '\.so$' >> "$file1"
 done < "$pathfile"
 
 
@@ -17,7 +17,7 @@ declare -A fnames
 i=0
 while IFS= read -r line
 do
-	filename=$(basename $line 2> /dev/null)
+	filename=$(basename "$line" 2> /dev/null)
 	exitcode=$?
 	if [ $exitcode == "1" ]
 	then
@@ -27,7 +27,7 @@ do
 done < "$file1"
 
 for key in "${!fnames[@]}"; 
-	do echo "${fnames[$key]}" >> $file2; 
+	do echo "${fnames[$key]}" >> "$file2"; 
 done
 
 
