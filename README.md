@@ -12,8 +12,8 @@ We update this repository to add more features and fix bugs. In case of any quer
 We have introduced new features, including improved scalability to handle larger binaries more efficiently, as well as added scripts that simplify and accelerate the analysis process. For more information, please see the section [run new features and options](#run-new-features-and-options).
 
 **⚡ UPGRADE TO LATEST OS!! ⚡**
-We have upgraded SysPart for use in latest ubuntu versions. (ubuntu 18.04+). We have tested in ubuntu 22.04. Please find more info about how to upgrade in the section [run in latest OS versions](#in-latest-os-versions).
-We have tested on : Debian 13 (trixie); Debian 12 (bookworm); Ubuntu (22.04 LTS); Ubuntu (24.04 LTS)
+We have upgraded SysPart for use in latest ubuntu versions. (ubuntu 22.04+) and Debian (Debian 12+). Please find more info about how to upgrade in the section [run in latest OS versions](#in-latest-os-versions).
+We have succesfully built on following versions: Debian 13 (trixie); Debian 12 (bookworm); Ubuntu (22.04 LTS); Ubuntu (24.04 LTS).
 
 
 
@@ -72,7 +72,7 @@ sudo apt install libunwind-dev python3
 ```
 
 #### In latest OS versions
-The initial repo was tested in ubuntu 18.04. We have upgraded it to work on latest ubuntu versions. As of now, we have tested on ubuntu 22.04. Please issue the following commands for the upgrade
+The initial repo was tested in ubuntu 18.04. We have upgraded it to work on latest ubuntu versions. As of now, we have tested on ubuntu 22.04+. Please issue the following commands for the upgrade
 ```
 ./build_upgraded_egalito.sh
 ```
