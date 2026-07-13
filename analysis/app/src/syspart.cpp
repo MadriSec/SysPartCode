@@ -1947,7 +1947,7 @@ void Syspart::run5(bool direct, bool icanalysisFlag, bool typearmorFlag)
     ip_callgraph.addNssEdges();
 
     int count=0;
-    cout<<"SRC_FN_NAME \t SRC_FN_ADDR \t SRC_FN_MODULE \t SRC_INSTR_ADDR \t AT_FN_NAME \t AT_FN_ADDR \t AT_FN_MODULE ";
+    cout<<"SRC_FN_NAME \t SRC_FN_ADDR \t SRC_FN_MODULE \t SRC_INSTR_ADDR \t AT_FN_NAME \t AT_FN_ADDR \t AT_FN_MODULE\n";
     for(auto i : ip_callgraph.nodeMap)
     {
         auto node = i.second;
