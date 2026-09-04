@@ -1490,87 +1490,97 @@ void IPCallGraph::findATList(Function * f) {
 
 }
 
-void IPCallGraph::parseDataWithNoSymbols(Module * module, address_t instrAddr, Function * f, DataSection * ds) {
-    if (ds -> getType() != DataSection::TYPE_DATA) {
-        LOG(20, "DataSection " << ds -> getName() << " not DATA");
+void IPCallGraph::parseDataWithNoSymbols(Module* module, address_t instrAddr, Function* f, DataSection *ds)
+{
+    if(ds->getType() != DataSection::TYPE_DATA)
+    {
+        LOG(20, "DataSection "<<ds->getName()<<" not DATA");
         return;
     }
     //Find all function pointers in data section
     auto pos = isModuleVisited.find(module);
     bool fl = false;
-    if (pos != isModuleVisited.end()) {
+    if(pos != isModuleVisited.end())
+    {
         fl = isModuleVisited[module][ds];
     }
-    if (fl == false) {
-        set < Function * > s;
-        auto total_ds = dsInModule[module];
-        DataSection * dsVec[total_ds.size()];
-        dsVec[0] = ds;
-        LOG(20, "Adding " << ds -> getName() << " at 0");
-
-        int next = 1;
-        for (int i = 0; i < next; i++) {
+    if(fl == false)
+    {
+        set<Function*> s;
+        std::vector<DataSection*> dsVec;
+        dsVec.push_back(ds);
+        LOG(20, "Adding "<<ds->getName()<<" at 0");
+        for(size_t i = 0; i < dsVec.size(); i++)
+        {
             auto d = dsVec[i];
             auto pos = isModuleVisited.find(module);
-            if (pos != isModuleVisited.end())
-                if (isModuleVisited[module][ds])
+            if(pos != isModuleVisited.end())
+                if(isModuleVisited[module][d])
                     continue;
-            LOG(20, "Adding all AT from section " << d << " " << d -> getName() << " in module " << module -> getName() << " " << total_ds.size());
-
-            for (auto dv: CIter::children(d)) {
-
-                auto dvLink = dv -> getDest();
-                if (dvLink) {
-                    auto dvTarget = dvLink -> getTarget();
-                    if (dvTarget) {
-                        if (Function * global_fun = dynamic_cast < Function * > (dvTarget)) {
+            LOG(20, "Adding all AT from section " << d << " " << d->getName()<<" in module "<<module->getName()<<" "<<dsVec.size());
+            for(auto dv : CIter::children(d))
+            {
+                auto dvLink = dv->getDest();
+                if(dvLink)
+                {
+                    auto dvTarget = dvLink->getTarget();
+                    if(dvTarget)
+                    {
+                        if(Function* global_fun = dynamic_cast<Function*>(dvTarget))
+                        {
                             addFunctionRoot(global_fun);
-                            LOG(5, " " << std::hex << global_fun -> getAddress() << " " << global_fun -> getName() << " ALL DATA");
+                            LOG(5, " "<<std::hex<<global_fun->getAddress()<<" "<<global_fun->getName()<<" ALL DATA");
                             globalATList.insert(global_fun);
                             s.insert(global_fun);
-                        } else if (auto plt = dynamic_cast < PLTTrampoline * > (dvTarget)) {
-                            if (auto plt_target = dynamic_cast < Function * > (plt -> getTarget())) {
+                        }
+                        else if(auto plt = dynamic_cast<PLTTrampoline *>(dvTarget))
+                        {
+                            if(auto plt_target = dynamic_cast<Function *>(plt->getTarget()))
+                            {
                                 addFunctionRoot(plt_target);
-                                LOG(5, " " << std::hex << plt_target -> getAddress() << " " << plt_target -> getName() << " ALL DATA");
+                                LOG(5, " "<<std::hex<<plt_target->getAddress()<<" "<<plt_target->getName()<<" ALL DATA");
                                 globalATList.insert(plt_target);
                                 s.insert(plt_target);
-                            } else {
-                                LOG(5, "plt " << plt -> getName() << " not resolved to a function in " << f -> getName());
                             }
-                        } else if (auto data_section = dynamic_cast < DataSection * > (dvTarget)) {
-                            if (data_section -> getType() != DataSection::TYPE_DATA)
+                            else
+                            {
+                                LOG(5, "plt "<<plt->getName()<<" not resolved to a function in "<<f->getName());
+                            }
+                        }
+                        else if(auto data_section = dynamic_cast<DataSection *>(dvTarget))
+                        {
+                            if(data_section->getType() != DataSection::TYPE_DATA)
                                 continue;
-                            bool exisiting_ds = false;
-                            for (int j = 0; j < next; j++) {
-                                if (dsVec[j] == data_section)
-                                    exisiting_ds = true;
-                            }
-                            if (!exisiting_ds) {
-                                LOG(20, "Adding " << data_section -> getName() << " at " << next);
-                                dsVec[next++] = data_section;
-                                for (int k = 0; k < next; k++) {
-                                    LOG(20, "DS Array " << k);
-                                    if (dsVec[k] != NULL) {
-                                        LOG(20, "DS Array " << dsVec[k]);
-                                        LOG(20, "DS Array " << dsVec[k] -> getName());
-                                    } else
+                            bool existing_ds = std::find(dsVec.begin(), dsVec.end(), data_section) != dsVec.end();
+                            if(!existing_ds)
+                            {
+                                LOG(20, "Adding "<<data_section->getName()<<" at "<<dsVec.size());
+                                dsVec.push_back(data_section);
+                                for(size_t k = 0; k < dsVec.size(); k++)
+                                {
+                                    LOG(20, "DS Array "<<k);
+                                    if(dsVec[k] != NULL)
+                                    {
+                                        LOG(20, "DS Array "<<dsVec[k]);
+                                        LOG(20, "DS Array "<<dsVec[k]->getName());
+                                    }
+                                    else
                                         LOG(20, "DS Array NULL");
-                                    LOG(20, "DS Array " << module -> getName());
-
+                                    LOG(20, "DS Array "<<module->getName());
                                 }
                             }
                         }
                     }
                 }
             }
-            isModuleVisited[module][ds] = true;
+            isModuleVisited[module][d] = true;
         }
         ATInData[module][ds] = s;
     }
-    for (auto e: ATInData[module][ds]) {
+    for(auto e : ATInData[module][ds])
+    {
         addATFunction(instrAddr, f, e);
     }
-
 }
 
 void IPCallGraph::parseData(Module * module, Instruction * instr, Function * f, DataSection * ds, address_t targetAddress, set < address_t > * visited) {
