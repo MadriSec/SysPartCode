@@ -36,6 +36,7 @@
 
 #include "conductor/filesystem.h"
 #include "nss.h"
+#include <unistd.h>
 
 
 NSSFuncsPass::NSSFuncsPass() {
@@ -153,6 +154,28 @@ void NSSFuncsPass::setupFuncs() {
     funcs["gethostbyname_r"] = "hosts";
     funcs["gethostbyaddr_r"] = "hosts";
 }
+static bool nssBackendExists(const std::string &backend) {
+    auto cfs = ConductorFilesystem::getInstance();
+    const std::string soname = "libnss_" + backend + ".so.2";
+
+    static const char *dirs[] = {
+        "/lib/x86_64-linux-gnu",
+        "/usr/lib/x86_64-linux-gnu",
+        "/lib",
+        "/usr/lib",
+        "/lib64",
+        "/usr/lib64",
+    };
+
+    for (const char *d : dirs) {
+        const std::string full =
+            cfs->transform(std::string(d) + "/" + soname);
+        if (access(full.c_str(), F_OK) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void NSSFuncsPass::loadConf() {
     std::ifstream conf(ConductorFilesystem::getInstance()
@@ -247,6 +270,15 @@ void NSSFuncsPass::loadConf() {
             if (lib[0] == '[') continue;
 	    if(nssModules.find(lib) != nssModules.end())
 		    liblist.push_back(lib);
+            
+            if(lib == "compat" || lib == "db" || lib == "dns" || lib == "files" ||
+            lib == "hesiod" || lib == "nis" || lib == "nisplus") {
+
+                if (nssBackendExists(lib)) {
+                    liblist.push_back(lib);
+                }
+            }
+
             
         }
     }

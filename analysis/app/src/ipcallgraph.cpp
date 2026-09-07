@@ -1,8 +1,8 @@
-#include<iostream>
+#include <iostream>
 #include <typeinfo>
-#include<stack>
+#include <stack>
 #include <fstream>
-#include<sstream>
+#include <sstream>
 using namespace std;
 #include <chrono>
 using namespace std::chrono;
@@ -22,7 +22,7 @@ using namespace std::chrono;
 #include "pass/collapseplt.h"
 #include "pass/resolveplt.h"
 #include "syspartUtility.h"
-#include<climits> //For INT_MIN
+#include <climits> //For INT_MIN
 
 #undef DEBUG_GROUP
 #define DEBUG_GROUP ipcallgraph
@@ -869,17 +869,24 @@ void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode * n, addres
 
 }
 
-void IPCallGraph::findDirectEdges(Function * f) {
-    if (visited_direct.count(f) != 0)
-        return;
+void IPCallGraph::findDirectEdges(Function *f)
+{
+	if (visited_direct.count(f) != 0)
+		return;
+	
+	if (!f){
+		return;
+	}
 
-    for (auto bl: CIter::children(f)) {
-        for (auto instr: CIter::children(bl)) {
-            auto semantic = instr -> getSemantic();
-            if (auto cfi = dynamic_cast < ControlFlowInstruction * > (semantic)) //Handling control flow instruction(direct edges)
-            {
-                auto link = cfi -> getLink();
-                auto target = link -> getTarget();
+	for (auto bl : CIter::children(f))
+	{
+		for (auto instr : CIter::children(bl))
+		{
+			auto semantic = instr->getSemantic();
+			if (auto cfi = dynamic_cast<ControlFlowInstruction *>(semantic)) // Handling control flow instruction(direct edges)
+			{
+				auto link = cfi->getLink();
+				auto target = link->getTarget();
 
                 if (auto func_target = dynamic_cast < Function * > (target)) //Call to a local function
                 {
@@ -1490,7 +1497,7 @@ void IPCallGraph::findATList(Function * f) {
 
 }
 
-void IPCallGraph::parseDataWithNoSymbols(Module* module, address_t instrAddr, Function* f, DataSection *ds)
+void IPCallGraph::parseDataWithNoSymbols(Module *module, address_t instrAddr, Function *f, DataSection *ds)
 {
     if(ds->getType() != DataSection::TYPE_DATA)
     {
