@@ -1,5 +1,7 @@
 #include<queue>
 #include<climits> //For INT_MIN
+#include <chrono> 
+using namespace std::chrono; 
 
 
 #include "syspart.h"
@@ -21,6 +23,11 @@
 void Syspart::setStartFunc(Function *func)
 {
 	this->start_func = func;
+}
+
+void Syspart::setStartFuncFile(string file)
+{
+	this->startFuncFile = file;
 }
 
 void Syspart::setProgram(Program *program)
@@ -79,6 +86,78 @@ Function* Syspart::findFunctionByName(string fname)
 	SYSTEM CALL RELATED METHODS
 	
 **********************************/
+
+void Syspart::populateDefaultSyscalls()
+{
+	system_calls = {{0,"read"}, {1,"write"}, {2,"open"}, {3,"close"}, {4,"stat"}, {5,"fstat"}, {6,"lstat"}, {7,"poll"}, {8,"lseek"}, {9,"mmap"}, {10,"mprotect"}, {11,"munmap"}, {12,"brk"}, {13,"rt_sigaction"}, {14,"rt_sigprocmask"}, {15,"rt_sigreturn"}, {16,"ioctl"}, {17,"pread64"}, {18,"pwrite64"}, {19,"readv"}, {20,"writev"}, {21,"access"}, {22,"pipe"}, {23,"select"}, {24,"sched_yield"}, {25,"mremap"}, {26,"msync"}, {27,"mincore"}, {28,"madvise"}, {29,"shmget"}, {30,"shmat"}, {31,"shmctl"}, {32,"dup"}, {33,"dup2"}, {34,"pause"}, {35,"nanosleep"}, {36,"getitimer"}, {37,"alarm"}, {38,"setitimer"}, {39,"getpid"}, {40,"sendfile"}, {41,"socket"}, {42,"connect"}, {43,"accept"}, {44,"sendto"}, {45,"recvfrom"}, {46,"sendmsg"}, {47,"recvmsg"}, {48,"shutdown"}, {49,"bind"}, {50,"listen"}, {51,"getsockname"}, {52,"getpeername"}, {53,"socketpair"}, {54,"setsockopt"}, {55,"getsockopt"}, {56,"clone"}, {57,"fork"}, {58,"vfork"}, {59,"execve"}, {60,"exit"}, {61,"wait4"}, {62,"kill"}, {63,"uname"}, {64,"semget"}, {65,"semop"}, {66,"semctl"}, {67,"shmdt"}, {68,"msgget"}, {69,"msgsnd"}, {70,"msgrcv"}, {71,"msgctl"}, {72,"fcntl"}, {73,"flock"}, {74,"fsync"}, {75,"fdatasync"}, {76,"truncate"}, {77,"ftruncate"}, {78,"getdents"}, {79,"getcwd"}, {80,"chdir"}, {81,"fchdir"}, {82,"rename"}, {83,"mkdir"}, {84,"rmdir"}, {85,"creat"}, {86,"link"}, {87,"unlink"}, {88,"symlink"}, {89,"readlink"}, {90,"chmod"}, {91,"fchmod"}, {92,"chown"}, {93,"fchown"}, {94,"lchown"}, {95,"umask"}, {96,"gettimeofday"}, {97,"getrlimit"}, {98,"getrusage"}, {99,"sysinfo"}, {100,"times"}, {101,"ptrace"}, {102,"getuid"}, {103,"syslog"}, {104,"getgid"}, {105,"setuid"}, {106,"setgid"}, {107,"geteuid"}, {108,"getegid"}, {109,"setpgid"}, {110,"getppid"}, {111,"getpgrp"}, {112,"setsid"}, {113,"setreuid"}, {114,"setregid"}, {115,"getgroups"}, {116,"setgroups"}, {117,"setresuid"}, {118,"getresuid"}, {119,"setresgid"}, {120,"getresgid"}, {121,"getpgid"}, {122,"setfsuid"}, {123,"setfsgid"}, {124,"getsid"}, {125,"capget"}, {126,"capset"}, {127,"rt_sigpending"}, {128,"rt_sigtimedwait"}, {129,"rt_sigqueueinfo"}, {130,"rt_sigsuspend"}, {131,"sigaltstack"}, {132,"utime"}, {133,"mknod"}, {134,"uselib"}, {135,"personality"}, {136,"ustat"}, {137,"statfs"}, {138,"fstatfs"}, {139,"sysfs"}, {140,"getpriority"}, {141,"setpriority"}, {142,"sched_setparam"}, {143,"sched_getparam"}, {144,"sched_setscheduler"}, {145,"sched_getscheduler"}, {146,"sched_get_priority_max"}, {147,"sched_get_priority_min"}, {148,"sched_rr_get_interval"}, {149,"mlock"}, {150,"munlock"}, {151,"mlockall"}, {152,"munlockall"}, {153,"vhangup"}, {154,"modify_ldt"}, {155,"pivot_root"}, {156,"_sysctl"}, {157,"prctl"}, {158,"arch_prctl"}, {159,"adjtimex"}, {160,"setrlimit"}, {161,"chroot"}, {162,"sync"}, {163,"acct"}, {164,"settimeofday"}, {165,"mount"}, {166,"umount2"}, {167,"swapon"}, {168,"swapoff"}, {169,"reboot"}, {170,"sethostname"}, {171,"setdomainname"}, {172,"iopl"}, {173,"ioperm"}, {174,"create_module"}, {175,"init_module"}, {176,"delete_module"}, {177,"get_kernel_syms"}, {178,"query_module"}, {179,"quotactl"}, {180,"nfsservctl"}, {181,"getpmsg"}, {182,"putpmsg"}, {183,"afs_syscall"}, {184,"tuxcall"}, {185,"security"}, {186,"gettid"}, {187,"readahead"}, {188,"setxattr"}, {189,"lsetxattr"}, {190,"fsetxattr"}, {191,"getxattr"}, {192,"lgetxattr"}, {193,"fgetxattr"}, {194,"listxattr"}, {195,"llistxattr"}, {196,"flistxattr"}, {197,"removexattr"}, {198,"lremovexattr"}, {199,"fremovexattr"}, {200,"tkill"}, {201,"time"}, {202,"futex"}, {203,"sched_setaffinity"}, {204,"sched_getaffinity"}, {205,"set_thread_area"}, {206,"io_setup"}, {207,"io_destroy"}, {208,"io_getevents"}, {209,"io_submit"}, {210,"io_cancel"}, {211,"get_thread_area"}, {212,"lookup_dcookie"}, {213,"epoll_create"}, {214,"epoll_ctl_old"}, {215,"epoll_wait_old"}, {216,"remap_file_pages"}, {217,"getdents64"}, {218,"set_tid_address"}, {219,"restart_syscall"}, {220,"semtimedop"}, {221,"fadvise64"}, {222,"timer_create"}, {223,"timer_settime"}, {224,"timer_gettime"}, {225,"timer_getoverrun"}, {226,"timer_delete"}, {227,"clock_settime"}, {228,"clock_gettime"}, {229,"clock_getres"}, {230,"clock_nanosleep"}, {231,"exit_group"}, {232,"epoll_wait"}, {233,"epoll_ctl"}, {234,"tgkill"}, {235,"utimes"}, {236,"vserver"}, {237,"mbind"}, {238,"set_mempolicy"}, {239,"get_mempolicy"}, {240,"mq_open"}, {241,"mq_unlink"}, {242,"mq_timedsend"}, {243,"mq_timedreceive"}, {244,"mq_notify"}, {245,"mq_getsetattr"}, {246,"kexec_load"}, {247,"waitid"}, {248,"add_key"}, {249,"request_key"}, {250,"keyctl"}, {251,"ioprio_set"}, {252,"ioprio_get"}, {253,"inotify_init"}, {254,"inotify_add_watch"}, {255,"inotify_rm_watch"}, {256,"migrate_pages"}, {257,"openat"}, {258,"mkdirat"}, {259,"mknodat"}, {260,"fchownat"}, {261,"futimesat"}, {262,"newfstatat"}, {263,"unlinkat"}, {264,"renameat"}, {265,"linkat"}, {266,"symlinkat"}, {267,"readlinkat"}, {268,"fchmodat"}, {269,"faccessat"}, {270,"pselect6"}, {271,"ppoll"}, {272,"unshare"}, {273,"set_robust_list"}, {274,"get_robust_list"}, {275,"splice"}, {276,"tee"}, {277,"sync_file_range"}, {278,"vmsplice"}, {279,"move_pages"}, {280,"utimensat"}, {281,"epoll_pwait"}, {282,"signalfd"}, {283,"timerfd_create"}, {284,"eventfd"}, {285,"fallocate"}, {286,"timerfd_settime"}, {287,"timerfd_gettime"}, {288,"accept4"}, {289,"signalfd4"}, {290,"eventfd2"}, {291,"epoll_create1"}, {292,"dup3"}, {293,"pipe2"}, {294,"inotify_init1"}, {295,"preadv"}, {296,"pwritev"}, {297,"rt_tgsigqueueinfo"}, {298,"perf_event_open"}, {299,"recvmmsg"}, {300,"fanotify_init"}, {301,"fanotify_mark"}, {302,"prlimit64"}, {303,"name_to_handle_at"}, {304,"open_by_handle_at"}, {305,"clock_adjtime"}, {306,"syncfs"}, {307,"sendmmsg"}, {308,"setns"}, {309,"getcpu"}, {310,"process_vm_readv"}, {311,"process_vm_writev"}, {312,"kcmp"}, {313,"finit_module"}, {314,"sched_setattr"}, {315,"sched_getattr"}, {316,"renameat2"}, {317,"seccomp"}, {318,"getrandom"}, {319,"memfd_create"}, {320,"kexec_file_load"}, {321,"bpf"}, {322,"execveat"}, {323,"userfaultfd"}, {324,"membarrier"}, {325,"mlock2"}, {326,"copy_file_range"}, {327,"preadv2"}, {328,"pwritev2"}, {329,"pkey_mprotect"}, {330,"pkey_alloc"}, {331,"pkey_free"}, {332,"statx"}, {333,"io_pgetevents"}, {334,"rseq"}, {424,"pidfd_send_signal"}, {425,"io_uring_setup"}, {426,"io_uring_enter"}, {427,"io_uring_register"}, {428,"open_tree"}, {429,"move_mount"}, {430,"fsopen"}, {431,"fsconfig"}, {432,"fsmount"}, {433,"fspick"}, {434,"pidfd_open"}, {435,"clone3"}, {512,"rt_sigaction"}, {513,"rt_sigreturn"}, {514,"ioctl"}, {515,"readv"}, {516,"writev"}, {517,"recvfrom"}, {518,"sendmsg"}, {519,"recvmsg"}, {520,"execve"}, {521,"ptrace"}, {522,"rt_sigpending"}, {523,"rt_sigtimedwait"}, {524,"rt_sigqueueinfo"}, {525,"sigaltstack"}, {526,"timer_create"}, {527,"mq_notify"}, {528,"kexec_load"}, {529,"waitid"}, {530,"set_robust_list"}, {531,"get_robust_list"}, {532,"vmsplice"}, {533,"move_pages"}, {534,"preadv"}, {535,"pwritev"}, {536,"rt_tgsigqueueinfo"}, {537,"recvmmsg"}, {538,"sendmmsg"}, {539,"process_vm_readv"}, {540,"process_vm_writev"}, {541,"setsockopt"}, {542,"getsockopt"}, {543,"io_setup"}, {544,"io_submit"}, {545,"execveat"}, {546,"preadv2"}, {547,"pwritev2"}};
+}
+
+bool Syspart::populateFromHeaders()
+{
+	auto isNumber = [](const std::string& s) -> bool
+	{
+		if(s.empty())
+		{
+			return false;
+		}
+		for(char c : s)
+		{
+			if(!std::isdigit(c))
+			{
+				return false;
+			}
+		}
+		return true;
+	};
+
+	auto processLine = [&](const std::string& line) 
+	{
+        	std::stringstream ss(line);
+	        std::string first, second, third;
+
+	        if (ss >> first >> second >> third) 
+		{
+	            const std::string syscallPrefix = "__NR_";
+
+        	    if (first == "#define" && second.rfind(syscallPrefix, 0) == 0 && isNumber(third)) 
+		    {
+	                std::string syscallName = second.substr(syscallPrefix.length());
+        	        system_calls[std::stoi(third)] = syscallName;
+            	    }
+        	}
+    	}; 
+
+
+	//First read /usr/include/asm-generic/unistd.h
+	std::ifstream inputFile1("/usr/include/asm-generic/unistd.h");
+	if(inputFile1.is_open())
+	{
+		std::string currentLine;
+		while (std::getline(inputFile1, currentLine))
+		{
+			processLine(currentLine);
+		}
+	}
+	//Read /usr/include/x86_64-linux-gnu/asm/unistd_64.h		
+	std::ifstream inputFile2("/usr/include/x86_64-linux-gnu/asm/unistd_64.h");
+	if(inputFile2.is_open())
+	{
+		std::string currentLine;
+		while(std::getline(inputFile2, currentLine))
+		{
+			processLine(currentLine);
+		}
+	}
+	return !system_calls.empty();
+}
+
+void Syspart::populateSyscallMap()
+{
+	if(!populateFromHeaders())
+		populateDefaultSyscalls();
+}
+
+
 Syspart::SysNode* Syspart::getSysNode(Function *f)
 {
 	for(auto s : syscall_mapping)
@@ -123,6 +202,39 @@ void Syspart::findDirectSyscallsOfModule(Module* m)
             }
         }
     }
+}
+
+void Syspart::printDirectSyscalls()
+{
+    for(auto m : CIter::children(program))
+    {	    
+    	for(auto f : CIter::functions(m))
+    	{
+	        FindSyscalls findSyscalls;
+        	f->accept(&findSyscalls);
+        	auto list = findSyscalls.getNumberMap();
+
+	        for(auto kv : list)
+        	{
+	            auto syscallValues = kv.second;
+        	    for(auto value : syscallValues)
+            	    {
+	                cout<<f->getName()<<" "<<std::hex<<f->getAddress()<<" "<<m->getName()<<" " <<system_calls[value]<<" "<<std::dec<<value<<"\n";
+        	    }
+        	}
+    	}
+    }
+}
+
+void Syspart::printAllFunctions()
+{
+	for(auto m : CIter::children(program))
+	{
+		for(auto f : CIter::functions(m))
+		{
+			cout<<f->getName()<<" "<<std::hex<<f->getAddress()<<" "<<m->getName()<<endl;
+		}
+	}
 }
 
 void Syspart::findCallGraphOfModule(Module* m)
@@ -174,13 +286,13 @@ void Syspart::findDirectSyscalls()
 		auto f = i.first;
 		auto ip_node = i.second;
 		SysNode *s = new SysNode;
-
+		//cout<<"Created node for "<<f->getName()<<endl;
 		FindSyscalls findSyscalls;
     	f->accept(&findSyscalls);
         auto list = findSyscalls.getNumberMap();
         s->syscallMap = list;
         s->func = f;
-        bitset<350> bs;   //initialized with zero;
+        bitset<600> bs;   //initialized with zero;
         for(auto kv : list)
         {
             auto syscallValues = kv.second;
@@ -289,6 +401,7 @@ void Syspart::findDerivedSyscalls1(Function* func)
     }while(updateFlag);
 }
 
+
 void Syspart::findDerivedSyscalls(Function* func)
 {
     int complexity=0;
@@ -340,8 +453,8 @@ void Syspart::findDerivedSyscalls(Function* func)
                 auto bitset_it = (sys_node->syscall_info).find(sys_child);
                 if(bitset_it == (sys_node->syscall_info).end())
                 {
-                    string bs_string(350,'0');
-                    bitset<350> bs(bs_string);
+                    string bs_string(600,'0');
+                    bitset<600> bs(bs_string);
                     bs.set(sysno);
                     (sys_node->syscall_info)[sys_child] = bs;
                 }
@@ -356,6 +469,65 @@ void Syspart::findDerivedSyscalls(Function* func)
             }
         }
     }
+}
+
+void Syspart::printDisass(string fname)
+{
+        Function* func = NULL;
+        if(fname.compare(0, 2, "0x") == 0)
+        {
+                address_t faddr = (address_t)stol(fname, NULL, 16);
+                func = findFunctionByAddress(faddr);
+        }
+        else
+        {
+                func = findFunctionByName(fname);
+        }
+        if(func != NULL)
+        {
+                 cout<<"DISASSEMBLY OF "<<func->getName()<<endl;
+                 ChunkDumper dump;
+                 func->accept(&dump);
+        }
+        cout<<endl;
+}
+
+
+void Syspart::findDerived4()
+{
+	bool changed_in_pass = true;
+	int pass_count = 0;
+
+	while(changed_in_pass)
+	{
+		changed_in_pass = false;
+		pass_count++;
+
+		for(auto i : ip_callgraph.nodeMap)
+		{
+			auto cur_node = i.second;
+			auto cur_iter = syscall_mapping.find(cur_node);
+			if(cur_iter == syscall_mapping.end())
+				continue;
+			auto cur_sys_node = cur_iter->second;
+			std::bitset<600> current_syscalls = (cur_sys_node->syscall_info)[cur_sys_node];
+			//cout<<(i.first)->getName()<<" "<<current_syscalls.to_string()<<endl;
+			for(auto child : cur_node->getAllCallTargets())
+			{
+				auto child_iter = syscall_mapping.find(child);
+				if(child_iter == syscall_mapping.end())
+					continue;
+				auto child_node = child_iter->second;
+				current_syscalls |= (child_node->syscall_info)[child_node];
+			}
+			if( current_syscalls != (cur_sys_node->syscall_info)[cur_sys_node])
+			{
+				(cur_sys_node->syscall_info)[cur_sys_node] = current_syscalls;
+				changed_in_pass = true;
+				//cout<<"CHANGED PASS "<<(i.first)->getName()<<endl;
+			}
+		}
+	}
 }
 
 void Syspart::findDerivedSyscalls3(Function* func)
@@ -385,14 +557,14 @@ void Syspart::findDerivedSyscalls3(Function* func)
     for(auto s : syscall_mapping)
     {
         auto sysnode = s.second;
-        string bs_string(350,'0');
-        bitset<350> bs(bs_string);
+        string bs_string(600,'0');
+        bitset<600> bs(bs_string);
         for(auto ss : sysnode->syscall_info)
         {
             if(sysnode != ss.first)
                 bs |= ss.second;
         }
-        for(int i=0; i<350; i++)
+        for(int i=0; i<600; i++)
         {
             if(bs.test(i))
                 sysnode->derived_syscalls.insert(i);
@@ -401,7 +573,7 @@ void Syspart::findDerivedSyscalls3(Function* func)
 
 }
 
-bitset<350> Syspart::buildSysCallTree(IPCallGraphNode* ip_node, bool *flag)
+bitset<600> Syspart::buildSysCallTree(IPCallGraphNode* ip_node, bool *flag)
 {
 	auto iter = syscall_mapping.find(ip_node);
   	if(iter == syscall_mapping.end())
@@ -423,8 +595,8 @@ bitset<350> Syspart::buildSysCallTree(IPCallGraphNode* ip_node, bool *flag)
     //cout<<build_recursion<<n->name<<" "<<build_count<<endl;
     build_count++;
     cout<<build_count<<endl;
-    bitset<350> bsFinal = (n->syscall_info)[n];
-    string bs_init_string(350,'0');
+    bitset<600> bsFinal = (n->syscall_info)[n];
+    string bs_init_string(600,'0');
     for(auto child : children)    //Loop to get the all the system calls of its children
     {
         
@@ -438,7 +610,7 @@ bitset<350> Syspart::buildSysCallTree(IPCallGraphNode* ip_node, bool *flag)
         auto mapIter = (n->syscall_info).find(child_node);
 
         
-        bitset<350> bs(bs_init_string);
+        bitset<600> bs(bs_init_string);
         if(mapIter != (n->syscall_info).end())  //contains
         {
             bs = mapIter->second;
@@ -625,8 +797,7 @@ bool Syspart::findFunctionsReachable(address_t addr, Function* func, string end)
             auto d_iter = direct_ch.find(instr->getAddress());
             if(d_iter != direct_ch.end())
             {
-                auto ipset = d_iter->second;
-                for(auto ip : ipset)
+                for(auto ip : *(d_iter->second))
                 {
                     stack_of_nodes.push(ip);
 		    cout<<ip->getFunction()->getName()<<" direct child of " << func->getName() <<" pushed to stack "<<endl;
@@ -642,7 +813,7 @@ bool Syspart::findFunctionsReachable(address_t addr, Function* func, string end)
             if(ind_iter != indirect_ch.end())
             {
                 auto ipset = ind_iter->second;
-                for(auto ip : ipset)
+                for(auto ip : *(ind_iter->second))
                 {
                     stack_of_nodes.push(ip);
 		    cout<<ip->getFunction()->getName()<<" indirect child of " << func->getName() <<" pushed to stack "<<endl;
@@ -839,8 +1010,7 @@ set<int> Syspart::findSyscallsAccessible(address_t addr, Function* f)
             auto d_iter = direct_ch.find(instr->getAddress());
             if(d_iter != direct_ch.end())
             {
-                auto ipset = d_iter->second;
-                for(auto ip : ipset)
+                for(auto ip : *(d_iter->second))
                 {
                     auto sy = syscall_mapping.find(ip);
                     if(sy == syscall_mapping.end())
@@ -855,8 +1025,7 @@ set<int> Syspart::findSyscallsAccessible(address_t addr, Function* f)
             auto ind_iter = indirect_ch.find(instr->getAddress());
             if(ind_iter != indirect_ch.end())
             {
-                auto ipset = ind_iter->second;
-                for(auto ip : ipset)
+                for(auto ip : *(ind_iter->second))
                 {
                     auto sy = syscall_mapping.find(ip);
                     if(sy == syscall_mapping.end())
@@ -1005,8 +1174,7 @@ set<Function*> Syspart::getThreadStartFunction()
         for(auto d : direct_ch)
         {
             auto addr = d.first;
-            auto children = d.second;
-            for(auto ch : children)
+            for(auto ch : *(d.second))
             {
                 auto t_name = ch->getFunction()->getName();
                 if(t_name.find("pthread_create") != string::npos)
@@ -1038,8 +1206,7 @@ set<Function*> Syspart::getThreadStartFunction()
         for(auto d : indirect_ch)
         {
             auto addr = d.first;
-            auto children = d.second;
-            for(auto ch : children)
+            for(auto ch : *(d.second))
             {
                 auto t_name = ch->getFunction()->getName();
                 if(t_name.find("pthread_create") != string::npos)
@@ -1129,8 +1296,7 @@ void Syspart::find_syscalls_in_thread(bool direct, bool icanalysisFlag, bool typ
                 auto d_iter = direct_ch.find(instr->getAddress());
                 if(d_iter != direct_ch.end())
                 {
-                    auto ipset = d_iter->second;
-                    for(auto ip : ipset)
+                    for(auto ip : *(d_iter->second))
                     {
                         auto sy = syscall_mapping.find(ip);
                         if(sy == syscall_mapping.end())
@@ -1143,8 +1309,7 @@ void Syspart::find_syscalls_in_thread(bool direct, bool icanalysisFlag, bool typ
                 auto ind_iter = indirect_ch.find(instr->getAddress());
                 if(ind_iter != indirect_ch.end())
                 {
-                    auto ipset = ind_iter->second;
-                    for(auto ip : ipset)
+                    for(auto ip : *(ind_iter->second))
                     {
                         auto sy = syscall_mapping.find(ip);
                         if(sy == syscall_mapping.end())
@@ -1327,6 +1492,48 @@ void Syspart::getDirectSyscalls()
 
 }
 
+void Syspart::run_fcg_with_argument_resolution(bool direct, bool icanalysisFlag, bool typearmorFlag, string function1, string function2, int reg1, int reg2, char*filename)
+{
+    auto func1 = findFunctionByName(function1);
+    if(func1 == NULL)
+    {
+	    cout<<"Function with name "<<function1<<" not found"<<endl;
+	    return;
+    }
+    auto func2 = findFunctionByName(function2);
+    if(func2==NULL){
+        cout<<"Function with name "<<function2<<" not found"<<endl;
+	    return;
+    }
+    ip_callgraph.setProgram(program);
+    ip_callgraph.setRoot(start_func);
+    ip_callgraph.resolveNss(setup);
+    ip_callgraph.setIcanalysis(icanalysisFlag);
+    ip_callgraph.setTypeArmor(typearmorFlag);
+    if(typearmorFlag)
+        ip_callgraph.setTypeArmorPath(typearmorPath);
+    if(direct)
+        ip_callgraph.generateDirectCallGraph();
+    else
+       ip_callgraph.generate();
+    ip_callgraph.addNssEdges();
+    finiFuncs = ip_callgraph.getFiniFuncs();
+    initFuncs = ip_callgraph.getInitFuncs();
+    ip_callgraph.printCallGraphWithCallsites();
+    //ip_callgraph.printCallGraph();
+    //ip_callgraph.printCallGraphofApplication();
+    //ip_callgraph.printDirectEdges();
+    cout<<"ARGUMENTRES-BEGIN-FUNC1"<<endl;
+    SyspartUtility util(program, &ip_callgraph, 0);
+    util.initialize();
+    std::unordered_set<UDResult> res1;
+    util.getArgumentsPassedToFunction(func1, reg1, res1);    
+
+    cout<<"ARGUMENTRES-BEGIN-FUNC2"<<endl;
+    std::unordered_set<UDResult> res2;
+    util.getArgumentsPassedToFunction(func2, reg2, res2);
+}
+
 /**** PRINT CALLGRAPH ********/
 void Syspart::run1(bool direct, bool icanalysisFlag, bool typearmorFlag)
 {
@@ -1351,6 +1558,158 @@ void Syspart::run1(bool direct, bool icanalysisFlag, bool typearmorFlag)
       
 }
 
+/**** PRINT CALLGRAPH ********/
+void Syspart::run16(bool direct, bool icanalysisFlag, bool typearmorFlag, int option)
+{
+    vector<Function*> allfuncs;
+    for(auto module : CIter::children(program))
+        {
+            for(auto func : CIter::functions(module))
+            {
+		    ip_callgraph.addFunctionRoot(func);
+		    //cout<<"Adding "<<func->getName()<<endl;
+		    allfuncs.push_back(func);
+            }
+        }
+
+    ip_callgraph.setProgram(program);
+
+    ip_callgraph.resolveNss(setup);
+    ip_callgraph.setIcanalysis(icanalysisFlag);
+    ip_callgraph.setTypeArmor(typearmorFlag);
+    if(typearmorFlag)
+        ip_callgraph.setTypeArmorPath(typearmorPath);
+    if(direct)
+        ip_callgraph.generateDirectCallGraph();
+    else
+       ip_callgraph.generate();
+    ip_callgraph.addNssEdges();
+    finiFuncs = ip_callgraph.getFiniFuncs();
+    initFuncs = ip_callgraph.getInitFuncs();
+
+    if(option == 1)             //Print callgraph
+    {
+            ip_callgraph.printCallGraphWithCallsites();
+            //ip_callgraph.writeCallgraphToBinaryFile();
+            //ip_callgraph.buildCallgraphFromBinaryFile("callgraph.bin");
+    }
+    else if(option == 2) //Print syscalls
+    {
+        findDirectSyscalls();
+        auto start = high_resolution_clock::now();
+	findDerived4();
+        auto stop = high_resolution_clock::now();
+        auto duration = duration_cast<seconds>(stop - start);
+        std::cerr << "Derived syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
+
+        std::bitset<600> combined;
+        start = high_resolution_clock::now();
+        for(auto st : allfuncs)
+        {
+            auto sys_node = getSysNode(st);
+            if(sys_node == NULL)
+            {
+                    std::cerr<<"No system calls generated for "<<st->getName()<<endl;
+                    continue;
+            }
+            auto bs = (sys_node->syscall_info)[sys_node];
+            combined |= bs;
+        }
+        stop = high_resolution_clock::now();
+        duration = duration_cast<seconds>(stop - start);
+        std::cerr << "Combined syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
+        for(int i=0; i<=combined.size(); i++)
+        {
+                if(combined[i] == 1)
+                {
+                        cout<<system_calls[i]<<endl;
+                }
+        }
+    }
+}
+
+
+
+/**** PRINT CALLGRAPH ********/
+void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag, int option)
+{ 
+    std::ifstream inputFile(startFuncFile);
+
+    if(!inputFile.is_open())
+    {
+	    cout<<"Could not open file "<<startFuncFile<<endl;
+	    return;
+    }
+    string func_name;
+    vector<Function*> startfuncs;
+    while(std::getline(inputFile, func_name))
+    {
+	    auto f = findFunctionByName(func_name);
+	    if(f != NULL)
+	    {
+	    	ip_callgraph.addFunctionRoot(f);
+		startfuncs.push_back(f);
+	    }
+	    else
+		    std::cerr<<f<<" not found"<<endl;
+    }
+    ip_callgraph.setProgram(program);
+
+    ip_callgraph.resolveNss(setup);
+    ip_callgraph.setIcanalysis(icanalysisFlag);
+    ip_callgraph.setTypeArmor(typearmorFlag);
+    if(typearmorFlag)
+        ip_callgraph.setTypeArmorPath(typearmorPath);
+    if(direct)
+        ip_callgraph.generateDirectCallGraph();
+    else
+       ip_callgraph.generate();
+    ip_callgraph.addNssEdges();
+    finiFuncs = ip_callgraph.getFiniFuncs();
+    initFuncs = ip_callgraph.getInitFuncs();
+
+    if(option == 1)		//Print callgraph
+    {
+	    ip_callgraph.printCallGraphWithCallsites();
+    	    //ip_callgraph.writeCallgraphToBinaryFile();
+            //ip_callgraph.buildCallgraphFromBinaryFile("callgraph.bin");
+    }
+    else if(option == 2) //Print syscalls
+    {
+    	findDirectSyscalls();
+    	auto start = high_resolution_clock::now();
+    	findDerived4();
+    	auto stop = high_resolution_clock::now();
+    	auto duration = duration_cast<seconds>(stop - start);
+    	std::cerr << "Derived syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
+
+    	std::bitset<600> combined;
+    	start = high_resolution_clock::now();
+    	for(auto st : startfuncs)
+    	{
+	    auto sys_node = getSysNode(st);
+            if(sys_node == NULL)
+            {
+		    std::cerr<<"No system calls generated for "<<st->getName()<<endl;
+		    continue;
+            }
+            auto bs = (sys_node->syscall_info)[sys_node];
+	    combined |= bs;
+    	}
+    	stop = high_resolution_clock::now();
+    	duration = duration_cast<seconds>(stop - start);
+    	std::cerr << "Combined syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
+	for(int i=0; i<=combined.size(); i++)
+	{
+    		if(combined[i] == 1)
+		{
+        		cout<<system_calls[i]<<endl;
+	        }
+    	}
+    }
+}
+
+
 /****** PRINTS SYSCALLINFO OF a specific function or ALL FUNCTIONS ****/
 void Syspart::run2(bool direct, bool icanalysisFlag, bool typearmorFlag, string func_name)
 {
@@ -1369,7 +1728,6 @@ void Syspart::run2(bool direct, bool icanalysisFlag, bool typearmorFlag, string 
   
     findDirectSyscalls();
     findDerivedSyscalls(start_func);
-    //cout<<"Syscall generation DONE"<<endl;
     
     if(func_name != "*")
     {
@@ -1377,26 +1735,97 @@ void Syspart::run2(bool direct, bool icanalysisFlag, bool typearmorFlag, string 
         if(f != NULL)
         {
 	    
-            //getSyscallInfo(f);
             auto sys_node = getSysNode(f);
             if(sys_node == NULL)
+	    {
                     cout<<"No system calls generated for "<<f->getName()<<endl;
+		    return;
+	    }
             auto tot_syscalls = getSyscalls(sys_node);
-	    cout<<"SYSCALLS [";
             for(auto t : tot_syscalls)
                 {
-                        cout<<system_calls[t]<<",";
+                        cout<<system_calls[t]<<endl;
                 }
-	    cout<<"]"<<endl;
-	    cout<<"SIZE "<<tot_syscalls.size()<<endl;
         }
     }
     else
     {
-        for(auto f : ip_callgraph.nodeMap)
-        {
-            getSyscallInfo(f.first);
-        }
+	int msize=0;
+	std::map<Module*,int> mod_func_count;
+	for(auto mod : CIter::children(program))
+	{
+		msize++;
+		int count=0;
+		for(auto f : CIter::functions(mod))
+		{
+                        if(getSysNode(f) == NULL)
+                                continue;
+
+			count++;
+		}
+		mod_func_count[mod] = count;
+	}
+	cout << "{\n";
+	int fcount=1, mcount=1;
+	for(auto mod : CIter::children(program))
+	{
+		auto fsize = mod_func_count[mod];
+
+		std::cout << "  \"" << mod->getName()  << "\": {\n";
+		fcount=1;
+		for(auto f : CIter::functions(mod))
+		{
+			auto func_name = f->getName();
+			std::stringstream func_id;
+    			func_id << f->getName() << "@" << std::hex << f->getAddress();
+
+	        	auto sys_node = getSysNode(f);
+        		if(sys_node == NULL)
+        	        	continue;
+	
+        		auto tot_syscalls = getSyscalls(sys_node);
+			std::cout << "    \"" << func_id.str() << "\": {\n";
+			std::cout << "      \"direct_syscalls\": [";
+			auto direct_syscalls = sys_node->direct_syscalls;
+			int i=1;
+			for(auto d : direct_syscalls)
+			{
+			        cout << "\"" << system_calls[d] << "\"";
+			        if (i < direct_syscalls.size()) 
+				{
+					cout << ", ";
+				}
+				i++;
+    			}
+			cout << "],\n";
+			// Reachable syscalls
+			std::cout << "      \"reachable_syscalls\": [";
+			i = 1;
+			for(auto t : tot_syscalls) 
+			{
+			        cout << "\"" << system_calls[t] << "\"";
+			        if (i < tot_syscalls.size()) 
+				{
+					cout << ", ";
+				}
+				i++;
+    			}
+			cout << "]\n";
+			cout << "  }";
+			if(fcount < fsize)
+			{
+				cout << ",";
+			}
+			cout<<"\n";	
+			fcount++;
+		}
+		cout << " }";
+		if(mcount < msize)
+			cout << ",";
+		cout<<"\n";
+		mcount++;
+	}
+	cout << "}\n";
     }
 }
 
@@ -1518,7 +1947,7 @@ void Syspart::run5(bool direct, bool icanalysisFlag, bool typearmorFlag)
     ip_callgraph.addNssEdges();
 
     int count=0;
-    cout<<"SRC_FN_NAME \t SRC_FN_ADDR \t SRC_FN_MODULE \t SRC_INSTR_ADDR \t AT_FN_NAME \t AT_FN_ADDR \t AT_FN_MODULE ";
+    cout<<"SRC_FN_NAME \t SRC_FN_ADDR \t SRC_FN_MODULE \t SRC_INSTR_ADDR \t AT_FN_NAME \t AT_FN_ADDR \t AT_FN_MODULE\n";
     for(auto i : ip_callgraph.nodeMap)
     {
         auto node = i.second;
@@ -1676,8 +2105,7 @@ void Syspart::getPartitionSize(bool direct, bool icanalysisFlag, bool typearmorF
                 auto d_iter = direct_ch.find(instr->getAddress());
                 if(d_iter != direct_ch.end())
                 {
-                    auto ipset = d_iter->second;
-                    for(auto ip : ipset)
+                    for(auto ip : *(d_iter->second))
                     {
                         if(visitedPartitionFns.find(ip->getFunction()) == visitedPartitionFns.end())
                             fStack.push(ip->getFunction());
@@ -1686,8 +2114,7 @@ void Syspart::getPartitionSize(bool direct, bool icanalysisFlag, bool typearmorF
                 auto ind_iter = indirect_ch.find(instr->getAddress());
                 if(ind_iter != indirect_ch.end())
                 {
-                    auto ipset = ind_iter->second;
-                    for(auto ip : ipset)
+                    for(auto ip : *(ind_iter->second))
                     {
                         if(visitedPartitionFns.find(ip->getFunction()) == visitedPartitionFns.end())
                             fStack.push(ip->getFunction());
@@ -2020,8 +2447,7 @@ void Syspart::syscallsOfMainLoop(bool icanalysisFlag, bool typearmorFlag, string
                 auto d_iter = direct_ch.find(instr->getAddress());
                 if(d_iter != direct_ch.end())
                 {
-                    auto ipset = d_iter->second;
-                    for(auto ip : ipset)
+                    for(auto ip : *(d_iter->second))
                     {
                         //cout<<"direct func  "<<ip->getFunction()<<endl;
                         if(visitedPartitionFns.find(ip->getFunction()) == visitedPartitionFns.end())
@@ -2031,9 +2457,8 @@ void Syspart::syscallsOfMainLoop(bool icanalysisFlag, bool typearmorFlag, string
                 auto ind_iter = indirect_ch.find(instr->getAddress());
                 if(ind_iter != indirect_ch.end())
                 {
-                  auto ipset = ind_iter->second;
                  //cout<<"IND "<<std::hex<<instr->getAddress()<<" "<<endl;
-                 for(auto ip : ipset)
+                 for(auto ip : *(ind_iter->second))
                  {
                     //cout<<"indirect func  "<<ip->getFunction()<<endl;
 
@@ -2215,7 +2640,7 @@ void Syspart::getArgumentValue(bool icanalysisFlag, bool typearmorFlag, string f
     //ip_callgraph.addNssEdges();
     SyspartUtility util(program, &ip_callgraph, 0);
     util.initialize();
-    vector<UDResult> res;
+    std::unordered_set<UDResult> res;
     util.getArgumentsPassedToFunction(func, reg , res);
 }
 
@@ -2248,13 +2673,13 @@ void Syspart::printDlArgs(string dlname)
     	initFuncs = ip_callgraph.getInitFuncs();
     	SyspartUtility util(program, &ip_callgraph, 0);
     	util.initialize();
-    	vector<UDResult> res;
 	int reg;
 	if(dlname == "dlopen")
 		reg = 7;
 	else if(dlname == "dlsym")
 		reg = 6;
-    	util.getArgumentsPassedToFunction(func, reg , res);
+    	std::unordered_set<UDResult> res;
+	util.getArgumentsPassedToFunction(func, reg , res);
 }
 
 
@@ -2318,13 +2743,13 @@ void Syspart::printAICT(bool icanalysisFlag, bool typearmorFlag)
         auto indirect_ch  = node->getIndirectChildren();
         auto mod_node = node->getFunction()->getParent()->getParent();
 
-        for(auto ind : indirect_ch)
+        for(const auto& ind : indirect_ch)
         {
-            sum += (ind.second).size();
+            sum += (ind.second)->size();
             n++;
             if(mod_node->getName() == "module-(executable)")
             {
-                sumapp += (ind.second).size();
+                sumapp += (ind.second)->size();
                 napp++;
             }
         }
@@ -2651,23 +3076,28 @@ void Syspart::getSyscallsFromDlsym(bool direct, bool icanalysisFlag, bool typear
     if(moreAT.size() > 0)
     {
         cout<<"Updating"<<endl;
-        for(auto f : ip_callgraph.nodeMap)
-        {
-            auto ipnode = f.second;
-            auto indirect_children = ipnode->getIndirectChildren();
-            for(auto ind : indirect_children)
-            {
-                auto addr = ind.first;
-                auto node_set = ind.second;
-                for(auto at : moreAT)
-                {
-                    node_set.insert(at);
-                }
-                ind.second = node_set;
-                ipnode->updateIndirectChildren(addr,node_set);
-            }
-        }
-    }  
+	
+	for (auto& f : ip_callgraph.nodeMap)  // auto& to avoid copying
+	{
+	    auto ipnode = f.second;
+	    auto indirect_children = ipnode->getIndirectChildren();  // reference to map
+
+	    for (auto& ind : indirect_children)  // auto& to modify via updateIndirectChildren
+    	    {
+        	auto addr = ind.first;
+	        auto& node_vec_ptr = ind.second;     // shared_ptr<const vector<IPCallGraphNode*>>
+        	auto& node_vec = *node_vec_ptr;      // dereference to get vector
+
+	        // Create a new vector with existing nodes + moreAT
+        	std::set<IPCallGraphNode*> merged(node_vec.begin(), node_vec.end());
+	        merged.insert(moreAT.begin(), moreAT.end());
+
+        	// Update the indirect children using ChildListManager
+	        ipnode->updateIndirectChildren(addr, merged);
+    	    }
+	}
+   }
+
     //ip_callgraph.printCallGraph();
     cout<<"Finding direct system calls"<<endl;
     findDirectSyscalls();

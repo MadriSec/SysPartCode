@@ -2,7 +2,13 @@
 *.swp
 tags
 *.out
+*.o
+*.d
+*.so
 analysis/app/.symlinks
+enforcement/.symlinks
 analysis/app/build_x86_64/
+enforcement/build_x86_64/
 analysis/app/loops
 analysis/app/syspart
+enforcement/sysenforce

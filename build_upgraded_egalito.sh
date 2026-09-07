@@ -1,8 +1,10 @@
 #!/bin/sh
 
+
 cd analysis/tools/egalito
-export USE_LOADER=0
-git checkout syspart-updated
+git checkout merger-wogramma
+git pull
+git submodule update --init --recursive
 make clean
 make -j 8
 cd ../../app

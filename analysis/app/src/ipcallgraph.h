@@ -1,19 +1,119 @@
 #ifndef IPCALLGRAPH_ANALYSIS
 #define IPCALLGRAPH_ANALYSIS
 
+#include <unordered_set>
+#include <unordered_map>
+#include <vector>
+#include <memory>
+#include <algorithm>
+#include <iostream>
+#include <deque>
+
+#include "instr/linked-x86_64.h"
 #include "conductor/setup.h"
 #include "chunk/concrete.h"
 #include "analysis/usedef.h"
 #include "analysis/dataflow.h"
 #include "nss.h"
 
+class IPCallGraphNode;
+
+struct VectorHash	//A functor which is a callable object (type)
+{
+	size_t operator()(const std::vector<IPCallGraphNode*>& v) const
+	{
+		size_t h = 0;
+		for(auto* ptr : v)
+		{
+			h ^= std::hash<IPCallGraphNode*>()(ptr) + 0x9e3779b9 + (h << 6) + (h >> 2); //Hash combine from boost
+		}
+	        return h;
+	}
+};
+
+struct VectorEqual    //A functor which is a callable object (type)
+{
+	bool operator()(const std::vector<IPCallGraphNode*>& a, const std::vector<IPCallGraphNode*>& b) const
+	{
+		return a == b;
+	}
+};
+
+class ChildListManager {
+
+	public:
+		using ChildListPtr = std::shared_ptr<const std::vector<IPCallGraphNode*>>;
+
+		ChildListPtr getOrCreate(const std::vector<IPCallGraphNode*>& vec)
+		{
+			auto it = cache.find(vec);
+
+			if(it != cache.end())
+			{
+				return it->second;
+			}
+			else
+			{
+				auto sharedp = std::make_shared<const std::vector<IPCallGraphNode*>>(vec);	//Creates a shared pointer that points to vec
+				cache[*sharedp] = sharedp;	//*sharedp dereferences the shared pointer and gives the vector (vec)
+				return sharedp;
+			}
+		}
+
+		ChildListPtr addChild(const ChildListPtr& oldList, IPCallGraphNode* child)
+		{
+			std::vector<IPCallGraphNode*> newVec(*oldList);
+			newVec.push_back(child);
+			return getOrCreate(newVec);
+		}
+
+		ChildListPtr removeChild(const ChildListPtr& oldList, IPCallGraphNode* child)
+		{
+			std::vector<IPCallGraphNode*> newVec;
+			for(IPCallGraphNode* n : *oldList)
+			{
+				if(n != child)
+				{
+					newVec.push_back(n);
+				}
+			}
+			return getOrCreate(newVec);
+		}
+
+		void cleanupCache() 
+		{
+     		   for (auto it = cache.begin(); it != cache.end(); ) 
+		   {
+            		if (it->second.use_count() == 1) 
+			{
+                		// Only referenced by cache itself safe to remove
+                		it = cache.erase(it);
+   		        } 
+			else 
+			{
+                		++it;
+            		}
+        	   }
+    	       }
+
+	 private:
+                std::unordered_map<std::vector<IPCallGraphNode*>, ChildListPtr, VectorHash, VectorEqual> cache;
+
+};
+
 class IPCallGraphNode
 {
+
+	public:
+		using ChildListPtr = std::shared_ptr<const std::vector<IPCallGraphNode*>>;
 	
+	private:
+
+	ChildListManager& listManager;
 	Function* func;
 	map<address_t,IPCallGraphNode*> parent;
-	map<address_t, set<IPCallGraphNode*>> direct_children; //Functions which are directly called along with the instruction address where it is called
-	map<address_t, set<IPCallGraphNode*>> indirect_children; //Functions which are indirectly called along with the instruction address where it is called
+	map<address_t, ChildListPtr> direct_children; //Functions which are directly called along with the instruction address where it is called
+	map<address_t, ChildListPtr> indirect_children; //Functions which are indirectly called along with the instruction address where it is called
 	set<address_t> indirectCalls; //Instruction with an indirect call
 	map<address_t, set<IPCallGraphNode*>> ATFunctions;	//Functions which are address taken(AT) along with the address of the instruction where it is AT
 	int color;
@@ -24,10 +124,7 @@ class IPCallGraphNode
 	std::set<Function*> atreturns;
 	public :
 
-		IPCallGraphNode(Function* f)
-		{
-			func = f;
-		}
+		IPCallGraphNode(Function* f, ChildListManager& mgr) : func(f), listManager(mgr) {}
 		void insertCallTarget(address_t iaddr, bool isDirect, IPCallGraphNode* t);
 		
 		void insertCallTargetSet(address_t iaddr, bool isDirect, set<IPCallGraphNode*> t);
@@ -50,19 +147,8 @@ class IPCallGraphNode
 		}
 		void addATFunction(address_t addr, IPCallGraphNode* t)
 		{
-			auto at_iter = ATFunctions.find(addr);
-			if(at_iter != ATFunctions.end())
-			{
-				auto at_set = at_iter->second;
-				at_set.insert(t);
-				at_iter->second = at_set;
-			}
-			else
-			{
-				set<IPCallGraphNode*> at_set;
-				at_set.insert(t);
-				ATFunctions[addr] = at_set;
-			}
+			auto& at_set = ATFunctions[addr];  // creates if not exists, returns reference
+			at_set.insert(t);                  // insert directly into the set
 		}
 		void setFunction(Function* f);
 		
@@ -118,17 +204,18 @@ class IPCallGraphNode
 		
 		map<address_t, set<IPCallGraphNode*>> getATList(); //Get all functions which are AT
 
-		map<address_t, set<IPCallGraphNode*>> getDirectChildren() {
+		map<address_t, ChildListPtr> getDirectChildren() {
 			return direct_children;
 		}
 
-		map<address_t, set<IPCallGraphNode*>> getIndirectChildren(){
+		map<address_t, ChildListPtr> getIndirectChildren(){
 			return indirect_children;
 		}
 
-		void updateIndirectChildren(address_t addr, set<IPCallGraphNode*> s)
+		void updateIndirectChildren(address_t addr, const std::set<IPCallGraphNode*>& s)
 		{
-			indirect_children[addr] = s;
+			std::vector<IPCallGraphNode*> vec(s.begin(), s.end());
+			indirect_children[addr] = listManager.getOrCreate(vec);
 		}
 		/*
 		set<IPCallGraphNode*> getallATFunctions()
@@ -150,7 +237,50 @@ class IPCallGraphNode
 };
 
 class IPCallGraph
-{	
+{
+	
+	public:
+
+		//Info for the binary representation of callgraph
+		//Header info
+		struct FileHeader 
+		{
+			uint32_t node_count;
+			uint32_t edge_count;
+		};
+
+		//Node info
+		struct NodeInfo 
+		{
+			address_t function_address;
+			std::string module_name;
+			std::string function_name;
+		};
+
+		//Edge info
+		struct EdgeInfo 
+		{
+			uint32_t caller_node_id;
+			address_t callsite_address;
+			uint32_t callee_node_id;
+			uint8_t edge_type;
+		};
+
+		enum class EdgeType : uint8_t
+		{
+			Direct = 0,
+			Indirect = 1,
+			Resolved = 2
+		};
+
+		 //In-memory data structures to represent callgraph
+
+	private:
+                std::map<std::string, uint32_t> node_map;
+                std::vector<NodeInfo> nodes;
+                std::vector<EdgeInfo> edges;
+
+
 	//TypeArmor variables
 	map<Function*, int> functionNargs;
 	set<Function*> nonvoidFn;
@@ -186,7 +316,8 @@ class IPCallGraph
 	void generateIndirectEdgesWithTypeArmor(IPCallGraphNode* n, address_t addr, set<IPCallGraphNode*> at);
 	void parseTypeArmor();
 	void printNodeInfo();
-	vector<Function*> functionRoots;
+	std::deque<Function*> functionRoots;
+	std::unordered_set<Function*> functionRootSet;
 	vector<address_t> dataRoots;
 	vector<Function*> nssFunctions;
 	vector<string> nssFuncNames;
@@ -200,6 +331,11 @@ class IPCallGraph
 	DataFlow df;
 	int totResolvedIcTarget=0;
 	int totTypeArmorTarget=0;
+	std::map<std::tuple<int, Function*, Instruction*>, bool> handle_arg_cache;
+	int forwardDfAnalysisType=0;
+	ChildListManager listManager;
+	std::unordered_map<std::string, std::set<IPCallGraphNode*>> moduleToAT;
+	set<IPCallGraphNode*> allAT;
 	public:
 	map<Function*, IPCallGraphNode*> nodeMap;
 	void addFunctionRoot(Function* func);
@@ -248,7 +384,7 @@ class IPCallGraph
 	}
 	void setTypeArmor(bool flag) //typeArmorFlag determines if you want to add typearmor analysis to filter indirect call targets
 	{
-		this->typeArmorFlag = true;
+		this->typeArmorFlag = flag;
 	}
 	void setTypeArmorPath(string path)
 	{
@@ -265,7 +401,7 @@ class IPCallGraph
 	void printCallGraphWithCallsites();
 	void printIndirectEdges();
 	void printDirectEdges();
-	bool forwardDataFlow(Function* f, Instruction* instr, Function* atfunc);
+	bool forwardDataFlow(Function* f, Instruction* instr, Function* atfunc, int analysisType=0);
 
 	set<Function*> getFunctionByAddress(address_t addr);
 	Function* getNSSFunctionByName(string name);
@@ -289,6 +425,19 @@ class IPCallGraph
 		nssFuncNames.push_back(fname);
 	}
 	void addNssEdges();
+	Instruction* findInstructionInFunction(Function* func, address_t addr);
+	bool handleReturnInstruction(UDState* state, int reg1, Function* atfunc);
+	bool handleIcallOrIjump(UDState* state, int reg1, Function* atfunc);
+	bool handleDirectCall(UDState* state, ControlFlowInstruction* cfi, int reg1, Function* atfunc);
+	bool handleDataLinked(UDState* state, int reg1, Function* atfunc);
+	bool handleRegisterDefinition(UDState* state, int reg1, Function* atfunc, bool& out_result);
+	bool handleMemoryDefinition(UDState* state, int reg1, Function* atfunc);
+
+	//Seriazability functions
+	void buildCallgraphFromBinaryFile(const std::string& filename);
+	void writeCallgraphToBinaryFile();
+	void writeStringToFile(std::ofstream& file, const std::string& str);
+	std::string readStringFromFile(std::ifstream& file); 
 };
 
 #endif

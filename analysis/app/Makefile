@@ -47,11 +47,11 @@ Makefile: rebuild-src
 endif
 
 $(ALL_OBJECTS): | $(BUILDTREE)
-$(BUILDTREE): ../tools/egalito/src/config/config.h
+$(BUILDTREE): ../tools/egalito/config/config.h
 	@mkdir -p $@
 
-../src/config/config.h:
-	$(call short-make,../tools/egalito/src/config)
+../config/config.h:
+	$(call short-make,../tools/egalito/config)
 
 .symlinks: $(OUTPUTS)
 	@touch .symlinks
