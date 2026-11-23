@@ -6,6 +6,21 @@ This repository is intended for running and exploring the tool's functionality. 
 
 The repository is updated with new features and bug fixes. For questions or issues, contact vrajagop@stevens.edu.
 
+## Codebase Map & Component Documentation
+
+Each functional unit in the repository has its own `README.md` detailing architecture, source files, inputs/outputs, CLI modes, and known quirks:
+
+| Component | Path | What It Covers |
+| --- | --- | --- |
+| Analysis Subsystem | [analysis/README.md](analysis/README.md) | High-level architecture and end-to-end static/dynamic analysis data flow. |
+| Core Analysis Engine | [analysis/app/README.md](analysis/app/README.md) | `syspart` & `loops` C++ engine (`testSyspart.cpp`, `syspart`, `ipcallgraph`, `syspartUtility`, `loopanalysis`, `nonreturnAnalysis`, `nss`) and full `-a` mode reference (`1`–`28`, `100`). |
+| Workflow & Helper Scripts | [analysis/app/src/scripts/README.md](analysis/app/src/scripts/README.md) | Scalable syscall pipelines (`compute_syscalls*.sh`), JSON callgraph compressor, BFS reachability, Pin & TypeArmor parsers, `findmain.sh`. |
+| Dynamic Library Analysis | [analysis/app/src/dlanalysis/README.md](analysis/app/src/dlanalysis/README.md) | Static `dlopen`/`dlsym` VFA & symbol-to-library matching, Mermaid FCG tracer, and `LD_PRELOAD` / `LD_AUDIT` dynamic tracers. |
+| Serving-Phase Loop Profiler | [analysis/app/src/pintool/README.md](analysis/app/src/pintool/README.md) | Intel Pin tool (`timeofouterloop.cpp`) and server workload scripts (`server_request_scripts/`). |
+| External Tools | [analysis/tools/README.md](analysis/tools/README.md) | Egalito submodule build variants and Intel Pin 3.11 setup. |
+| Enforcement Component | [enforcement/README.md](enforcement/README.md) | Seccomp-BPF skip-list filter generator (`seccomp.py`, `skip_list_filter.py`, `filter_template.c`) and Egalito binary rewriter (`sysenforce`). |
+| Integration Tests | [test/Readme.md](test/Readme.md) | `hello`, `helloIndirect`, and `helloDynamic` test suite and runner. |
+
 ## What's New
 
 ### Scalable analysis
