@@ -61,6 +61,17 @@ void IPCallGraphNode::insertCallTargetSet(address_t iaddr, bool isDirect, set < 
     }
 }
 
+void IPCallGraphNode::insertSharedIndirectTargetList(address_t iaddr, const ChildListPtr& sharedList) {
+    auto it = indirect_children.find(iaddr);
+    if (it == indirect_children.end()) {
+        indirect_children[iaddr] = sharedList;
+    } else if (it->second != sharedList) {
+        std::vector<IPCallGraphNode*> merged(*it->second);
+        merged.insert(merged.end(), sharedList->begin(), sharedList->end());
+        indirect_children[iaddr] = listManager.getOrCreate(merged);
+    }
+}
+
 void IPCallGraphNode::removeAllCallTargets(IPCallGraphNode * t) {
     for (auto & [addr, childListPtr]: direct_children) {
         direct_children[addr] = listManager.removeChild(childListPtr, t);
@@ -85,7 +96,7 @@ void IPCallGraphNode::removeCallTarget(address_t addr, IPCallGraphNode * t) {
 }
 
 void IPCallGraphNode::removeParent(IPCallGraphNode * p) {
-    address_t addr_to_be_removed;
+    address_t addr_to_be_removed = 0;
     int flag = 0;
     for (auto parent_iter: parent) {
         auto par = parent_iter.second;
@@ -99,6 +110,9 @@ void IPCallGraphNode::removeParent(IPCallGraphNode * p) {
         LOG(20, "Removed parent " << p -> getFunction() -> getName() << " from " << this -> func -> getName());
 
     }
+    if (sharedUnresolvedCallers != nullptr && sharedUnresolvedCallers->count(p) != 0) {
+        removedUnresolvedCallers.insert(p);
+    }
 }
 
 void IPCallGraphNode::removeParent(address_t addr, IPCallGraphNode * p) {
@@ -108,7 +122,9 @@ void IPCallGraphNode::removeParent(address_t addr, IPCallGraphNode * p) {
         LOG(20, "Removed " << p -> getFunction() -> getName() << " at " << addr << " from " << this -> func -> getName());
 
     }
-
+    if (sharedUnresolvedCallSites != nullptr) {
+        removedUnresolvedCallSites.emplace(addr, p);
+    }
 }
 
 void IPCallGraphNode::setFunction(Function * f) {
@@ -127,14 +143,17 @@ void IPCallGraphNode::insertParent(address_t addr, IPCallGraphNode * p, bool typ
 
 set < IPCallGraphNode * > IPCallGraphNode::getAllCallTargets() {
     set < IPCallGraphNode * > s;
-    for (auto & c: direct_children) {
-        auto & vec = * (c.second); // dereference shared_ptr
+    std::unordered_set<const std::vector<IPCallGraphNode*>*> seenLists;
+    for (const auto & c: direct_children) {
+        if (!seenLists.insert(c.second.get()).second) continue;
+        const auto & vec = * (c.second); // dereference shared_ptr
         s.insert(vec.begin(), vec.end()); // insert all elements into set
     }
 
     // Indirect children
-    for (auto & c: indirect_children) {
-        auto & vec = * (c.second);
+    for (const auto & c: indirect_children) {
+        if (!seenLists.insert(c.second.get()).second) continue;
+        const auto & vec = * (c.second);
         s.insert(vec.begin(), vec.end());
     }
     return s;
@@ -656,91 +675,36 @@ void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n) {
 */
 
 void IPCallGraph::generateIndirectEdges(IPCallGraphNode * n) {
-    auto ics = n -> getIndirectCallSites();
-    set < IPCallGraphNode * > s = allAT;
-    /*
-    for(auto f : globalATList)
-    {
-    	auto node_iter = nodeMap.find(f);
-    	IPCallGraphNode* node_f;
-    	if(node_iter == nodeMap.end())
-    	{
-    		node_f = new IPCallGraphNode(f, listManager);
-    		df.getWorkingSet(f);
-    		LOG(15, f<<" "<<node_f<<" "<<std::hex<<f->getAddress()<<" "<<f->getName());
-    		nodeMap[f] = node_f;
-    	}
-    	else
-    		node_f = (node_iter)->second;
-    	s.insert(node_f);
-    }
-    */
+    const auto& ics = n -> getIndirectCallSitesRef();
+    if (ics.empty()) return;
+
     auto cur_func = n -> getFunction();
     for (auto bl: CIter::children(cur_func)) {
         for (auto instr: CIter::children(bl)) {
             auto addr = instr -> getAddress();
             if (ics.count(addr) == 0) //Not an indirect call
                 continue;
-            if (auto ici = dynamic_cast < IndirectCallInstruction * > (instr -> getSemantic())) {
-                nicalls++;
-                if (icanalysisFlag) {
-                    if (n -> isIcallResolved(addr)) {
-                        resolvedIcalls++;
-                        auto inc = n -> getIndirectChildren();
-                        for (auto i: inc) {
-                            if (i.first != addr)
-                                continue;
-
-                            for (auto ict: * (i.second)) {
-                                totResolvedIcTarget++;
-                            }
-
-                        }
-                        continue;
-                    }
-
-                }
-                n -> setIcallResolved(addr, false);
-
-                if (!typeArmorFlag) //If TypeArmor not enabled
-                {
-                    n -> insertCallTargetSet(addr, false, s);
-                    for (auto node_f: s) {
-                        node_f -> insertParent(addr, n, false);
+            nicalls++;
+            if (icanalysisFlag) {
+                if (n -> isIcallResolved(addr)) {
+                    resolvedIcalls++;
+                    const auto& inc = n -> getIndirectChildrenRef();
+                    auto incIt = inc.find(addr);
+                    if (incIt != inc.end()) {
+                        totResolvedIcTarget += incIt -> second -> size();
                     }
                     continue;
-                } else
-                    generateIndirectEdgesWithTypeArmor(n, addr, s);
-            } else //Not an indirect call instruction, but can be datalinked instruction or an indirect jump instruction
+                }
+            }
+            n -> setIcallResolved(addr, false);
+
+            if (!typeArmorFlag) //If TypeArmor not enabled
             {
-                nicalls++;
-                if (icanalysisFlag) {
-                    if (n -> isIcallResolved(addr)) {
-                        resolvedIcalls++;
-                        auto inc = n -> getIndirectChildren();
-                        for (auto i: inc) {
-                            if (i.first != addr)
-                                continue;
-                            for (auto ict: * (i.second)) {
-                                totResolvedIcTarget++;
-                            }
-
-                        }
-                        continue;
-                    }
-
-                }
-
-                n -> setIcallResolved(addr, false);
-                if (!typeArmorFlag) //If TypeArmor not enabled
-                {
-                    n -> insertCallTargetSet(addr, false, s);
-                    for (auto node_f: s) {
-                        node_f -> insertParent(addr, n, false);
-                    }
-                    continue;
-                } else
-                    generateIndirectEdgesWithTypeArmor(n, addr, s);
+                n -> insertSharedIndirectTargetList(addr, allATListPtr);
+                unresolvedIndirectCallSites.emplace_back(addr, n);
+                unresolvedIndirectCallers.insert(n);
+            } else {
+                generateIndirectEdgesWithTypeArmor(n, addr, allAT);
             }
         }
     }
@@ -800,7 +764,7 @@ void IPCallGraph::pruneIndirectEdges(IPCallGraphNode * node) {
     }
 }
 
-void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode * n, address_t addr, set < IPCallGraphNode * > at) {
+void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode * n, address_t addr, const set < IPCallGraphNode * >& at) {
     auto module = (Module * ) n -> getFunction() -> getParent() -> getParent();
 
     bool found = false;
@@ -818,10 +782,9 @@ void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode * n, addres
     if (!found) //Couldn't find nargs for this icall
     {
         //LOG(1,"UNRESOLVED TA ICALL "<<std::hex<<addr<<" "<<module->getName());
-        n -> insertCallTargetSet(addr, false, at);
-        for (auto node_f: at) {
-            node_f -> insertParent(addr, n, false);
-        }
+        n -> insertSharedIndirectTargetList(addr, allATListPtr);
+        unresolvedIndirectCallSites.emplace_back(addr, n);
+        unresolvedIndirectCallers.insert(n);
         totTypeArmorTarget += at.size();
 
         return;
@@ -1876,6 +1839,9 @@ void IPCallGraph::generate() {
 
     }
     start = high_resolution_clock::now();
+    allAT.clear();
+    unresolvedIndirectCallSites.clear();
+    unresolvedIndirectCallers.clear();
     for (auto f: globalATList) {
         auto node_iter = nodeMap.find(f);
         IPCallGraphNode * node_f;
@@ -1888,6 +1854,12 @@ void IPCallGraph::generate() {
         }
 
         allAT.insert(node_f);
+    }
+
+    std::vector<IPCallGraphNode*> allATVec(allAT.begin(), allAT.end());
+    allATListPtr = listManager.getOrCreate(allATVec);
+    for (auto* node_f: allAT) {
+        node_f -> setAllATParentHub(&unresolvedIndirectCallSites, &unresolvedIndirectCallers);
     }
 
     for (auto n: nodeMap) {

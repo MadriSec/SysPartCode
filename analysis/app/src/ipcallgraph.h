@@ -122,12 +122,25 @@ class IPCallGraphNode
 	map<address_t, bool> icallResolved;
 	map<tuple<address_t, IPCallGraphNode*>, bool> parentType;
 	std::set<Function*> atreturns;
+	const std::vector<std::pair<address_t, IPCallGraphNode*>>* sharedUnresolvedCallSites = nullptr;
+	const std::set<IPCallGraphNode*>* sharedUnresolvedCallers = nullptr;
+	std::set<IPCallGraphNode*> removedUnresolvedCallers;
+	std::set<std::pair<address_t, IPCallGraphNode*>> removedUnresolvedCallSites;
 	public :
 
 		IPCallGraphNode(Function* f, ChildListManager& mgr) : func(f), listManager(mgr) {}
 		void insertCallTarget(address_t iaddr, bool isDirect, IPCallGraphNode* t);
 		
 		void insertCallTargetSet(address_t iaddr, bool isDirect, set<IPCallGraphNode*> t);
+		void insertSharedIndirectTargetList(address_t iaddr, const ChildListPtr& sharedList);
+
+		void setAllATParentHub(
+			const std::vector<std::pair<address_t, IPCallGraphNode*>>* sites,
+			const std::set<IPCallGraphNode*>* callers)
+		{
+			sharedUnresolvedCallSites = sites;
+			sharedUnresolvedCallers = callers;
+		}
 
 		set<address_t> getIcallSite()
 		{
@@ -177,9 +190,19 @@ class IPCallGraphNode
 		set<IPCallGraphNode*> getParent()
 		{
 			set<IPCallGraphNode*> s;
-			for(auto i : parent)
+			for(const auto& i : parent)
 			{
 				s.insert(i.second);
+			}
+			if(sharedUnresolvedCallers != nullptr)
+			{
+				for(auto* caller : *sharedUnresolvedCallers)
+				{
+					if(removedUnresolvedCallers.empty() || removedUnresolvedCallers.count(caller) == 0)
+					{
+						s.insert(caller);
+					}
+				}
 			}
 			return s;
 		}
@@ -191,7 +214,20 @@ class IPCallGraphNode
 
 		map<address_t,IPCallGraphNode*> getParentCallSites()
 		{
-			return parent;
+			if(sharedUnresolvedCallSites == nullptr)
+			{
+				return parent;
+			}
+			map<address_t, IPCallGraphNode*> res = parent;
+			for(const auto& site : *sharedUnresolvedCallSites)
+			{
+				if(!removedUnresolvedCallers.empty() && removedUnresolvedCallers.count(site.second) != 0)
+					continue;
+				if(!removedUnresolvedCallSites.empty() && removedUnresolvedCallSites.count(site) != 0)
+					continue;
+				res.emplace(site.first, site.second);
+			}
+			return res;
 		}
 		set<IPCallGraphNode*> getAllCallTargets(); //Get all functions called
 
@@ -213,6 +249,14 @@ class IPCallGraphNode
 		}
 
 		map<address_t, ChildListPtr> getIndirectChildren(){
+			return indirect_children;
+		}
+
+		const map<address_t, ChildListPtr>& getDirectChildrenRef() const {
+			return direct_children;
+		}
+
+		const map<address_t, ChildListPtr>& getIndirectChildrenRef() const {
 			return indirect_children;
 		}
 
@@ -317,7 +361,7 @@ class IPCallGraph
 	bool handleArgumentFnPtr(int reg, Function* f, Instruction* instr, Function* atfunc);
 	void checkForSymbols();
 	void generateIndirectEdges(IPCallGraphNode* n);
-	void generateIndirectEdgesWithTypeArmor(IPCallGraphNode* n, address_t addr, set<IPCallGraphNode*> at);
+	void generateIndirectEdgesWithTypeArmor(IPCallGraphNode* n, address_t addr, const set<IPCallGraphNode*>& at);
 	void parseTypeArmor();
 	void printNodeInfo();
 	struct DataSectionIndex {
@@ -372,6 +416,9 @@ class IPCallGraph
 	ChildListManager listManager;
 	std::unordered_map<std::string, std::set<IPCallGraphNode*>> moduleToAT;
 	set<IPCallGraphNode*> allAT;
+	IPCallGraphNode::ChildListPtr allATListPtr;
+	std::vector<std::pair<address_t, IPCallGraphNode*>> unresolvedIndirectCallSites;
+	std::set<IPCallGraphNode*> unresolvedIndirectCallers;
 	public:
 	map<Function*, IPCallGraphNode*> nodeMap;
 	void addFunctionRoot(Function* func);
@@ -444,6 +491,14 @@ class IPCallGraph
 	const std::set<Function *>& getGlobalATList() const
 	{
 		return globalATList;
+	}
+	const std::set<IPCallGraphNode*>& getAllATNodes() const
+	{
+		return allAT;
+	}
+	const IPCallGraphNode::ChildListPtr& getAllATListPtr() const
+	{
+		return allATListPtr;
 	}
 	void addtoGlobalATList(Function* func)
 	{
