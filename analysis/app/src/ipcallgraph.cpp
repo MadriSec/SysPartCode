@@ -161,7 +161,6 @@ void IPCallGraph::addFunctionRoot(Function * func) {
     auto start_iter = nodeMap.find(func);
     if (start_iter == nodeMap.end()) {
         IPCallGraphNode * start_node = new IPCallGraphNode(func, listManager);
-        df.getWorkingSet(func);
         nodeMap[func] = start_node;
     }
 }
@@ -173,7 +172,6 @@ void IPCallGraph::setRoot(Function * func) {
     auto start_iter = nodeMap.find(func);
     if (start_iter == nodeMap.end()) {
         IPCallGraphNode * start_node = new IPCallGraphNode(func, listManager);
-        df.getWorkingSet(func);
         nodeMap[func] = start_node;
     }
 
@@ -229,7 +227,6 @@ void IPCallGraph::addEdge(address_t addr, Function * start, Function * end, bool
 
     if (start_iter == nodeMap.end()) {
         start_node = new IPCallGraphNode(start, listManager);
-        df.getWorkingSet(start);
         nodeMap[start] = start_node;
 
     } else
@@ -237,7 +234,6 @@ void IPCallGraph::addEdge(address_t addr, Function * start, Function * end, bool
 
     if (end_iter == nodeMap.end()) {
         end_node = new IPCallGraphNode(end, listManager);
-        df.getWorkingSet(end);
 
         nodeMap[end] = end_node;
     } else
@@ -256,7 +252,6 @@ void IPCallGraph::addATFunction(address_t addr, Function * start, Function * ATf
 
     if (start_iter == nodeMap.end()) {
         start_node = new IPCallGraphNode(start, listManager);
-        df.getWorkingSet(start);
         LOG(15, start << " " << start_node << " " << std::hex << start -> getAddress() << " " << start -> getName());
         nodeMap[start] = start_node;
     } else
@@ -264,7 +259,6 @@ void IPCallGraph::addATFunction(address_t addr, Function * start, Function * ATf
 
     if (ATfunc_iter == nodeMap.end()) {
         ATfunc_node = new IPCallGraphNode(ATfunc, listManager);
-        df.getWorkingSet(ATfunc);
         LOG(15, ATfunc << " " << ATfunc_node << " " << std::hex << ATfunc -> getAddress() << " " << ATfunc -> getName());
 
         nodeMap[ATfunc] = ATfunc_node;
@@ -280,7 +274,6 @@ void IPCallGraph::addIndirectSource(address_t addr, Function * func) {
     IPCallGraphNode * n;
     if (f_iter == nodeMap.end()) {
         n = new IPCallGraphNode(func, listManager);
-        df.getWorkingSet(func);
         LOG(15, func << " " << n << " " << std::hex << func -> getAddress() << " " << func -> getName());
 
         nodeMap[func] = n;
@@ -1823,7 +1816,6 @@ void IPCallGraph::generate() {
         IPCallGraphNode * node_f;
         if (node_iter == nodeMap.end()) {
             node_f = new IPCallGraphNode(f, listManager);
-            df.getWorkingSet(f);
             LOG(15, f << " " << node_f << " " << std::hex << f -> getAddress() << " " << f -> getName());
             nodeMap[f] = node_f;
         } else {

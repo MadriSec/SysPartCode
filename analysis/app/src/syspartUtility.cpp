@@ -157,7 +157,7 @@ void SyspartUtility::getArgumentsPassedToFunction_helper(Function* func, int reg
     };
 
     // Early exit if func is in global AT list
-    auto globalATList = ip_callgraph->getGlobalATList();
+    const auto& globalATList = ip_callgraph->getGlobalATList();
     if (globalATList.count(func) != 0) {
         pushUnknownIfNeeded(collectedResults, func);
         LOG(1, "ICALL_RESOLVE AT_FUNC " << std::dec << reg << " " << func->getName());
@@ -971,25 +971,26 @@ void SyspartUtility::printResult(UDResult res)
 
 string SyspartUtility::getFunctionName(address_t addr)
 {
-    string func_name="";
-    for(auto module : CIter::children(program))
+    ensureAddrIndex();
+    auto it = addrToFuncs.find(addr);
+    if(it != addrToFuncs.end() && !it->second.empty())
     {
-        for(auto func : CIter::functions(module))
-        {
-            if(func->getAddress() == addr)
-                func_name = func->getName();
-        }
+        return it->second.back()->getName();
     }
-    return func_name;
+    return "";
 }
 
 bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
 {
+    if (n->getIndirectCallSitesRef().empty())
+    {
+        return false;
+    }
     recursion_iter++;
     auto function = n->getFunction();
     bool resolvedFlag = false;
 
-    auto working = df.getWorkingSet(function);
+    UDRegMemWorkingSet* working = nullptr;
 
     auto pushUnknownIfNeeded = [&](std::unordered_set<UDResult>& results, Function* function) 
     {
@@ -1028,121 +1029,11 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
         }
     };
 
-    enum class BinaryOpType { ADD, SUB };
-    auto combineResults = [&](const std::unordered_set<UDResult>& a,
-                                const std::unordered_set<UDResult>& b,
-                                BinaryOpType op,
-                                std::unordered_set<UDResult>& out) 
-    {
-        LOG(1, "Res1.size "<<a.size()<< " Res2.size "<<b.size());
-        if(op == BinaryOpType::ADD)
-                LOG(1, "ADD");
-        else if(op == BinaryOpType::SUB)
-                LOG(1, "SUB");
-	    int tot_count=1000000;
-	    int i=0;
-        for (const auto& res1 : a) 
-        {
-		    if(i > tot_count)
-		    {
-			     break;
-		    }
-                for (const auto& res2 : b) 
-                {
-		          if(i > tot_count)
-		          {
-			         break;
-		          }
-		          i++;
-                  if (res1.type == 0 || res2.type == 0)
-                  {
-                        pushUnknownIfNeeded(out, function);
-
-                  } 
-                  else if (res1.type == 1 && res2.type == 1) 
-                  {
-                        address_t new_val = (op == BinaryOpType::ADD)
-                        ? res1.addr + res2.addr
-                        : res1.addr - res2.addr;
-                        std::stringstream sstream;
-                        sstream << "0x" << std::hex << new_val;
-                        std::string new_str = sstream.str();
-                        out.emplace(1, new_val, new_str, function);
-                  } 
-                  else 
-                  {
-                        std::string op_str = (op == BinaryOpType::ADD) ? " + " : " - ";
-                        std::string new_str = res1.desc + op_str + res2.desc;
-                        out.emplace(3, 0, new_str, function);
-                  }
-                }
-        }
-    };
-
-	enum class ConstOpType { ADD, SUB, MULT };
-    auto combineWithConstant = [&](const std::unordered_set<UDResult>& vals,
-                              address_t constant,
-                              ConstOpType op,
-                              std::unordered_set<UDResult>& out) 
-    {
-
-        LOG(1, "Res1.size "<<vals.size()<<std::hex<<constant);
-        if(op == ConstOpType::ADD)
-            LOG(1, "ADD");
-        else if(op == ConstOpType::SUB)
-            LOG(1, "SUB");
-	   else if(op == ConstOpType::MULT)
-		    LOG(1, "MULT");
-
-        for (const auto& udres : vals) 
-        {
-            if (udres.type == 0)
-            {
-	                LOG(1,"Combine with constant");
-        	        pushUnknownIfNeeded(out, function);
-            }
-            else if (udres.type == 1) 
-            {
-			    address_t new_val;
-		        if (op == ConstOpType::ADD)
-				    new_val =  udres.addr + constant;
-			    else if (op == ConstOpType::SUB)
- 	                new_val = udres.addr - constant;
-			    else if (op ==  ConstOpType::MULT)
-				    new_val = udres.addr * constant;
-	            std::stringstream sstream;
-        	    sstream << "0x" << std::hex << new_val;
-                out.emplace(1, new_val, sstream.str(), function);
-            } 
-		    else 
-		    {
-                	std::stringstream sstream;
-	                if (op == ConstOpType::ADD) 
-                    {
-        	                sstream << "val(0x" << std::hex << constant << " + " << udres.desc<<")";
-                	} 
-			        else if (op == ConstOpType::SUB)
-			         {
-                        	sstream << "val(" << udres.desc << " - 0x" << std::hex << constant<<  ")";
-                	}
-			         else if (op == ConstOpType::MULT)
-                        {
-				        sstream << "val(0x" << std::hex << constant << " * " << udres.desc << ")";
-                        }
-
-                	out.emplace(3, 0, sstream.str(), function);
-                }
-        }
-    };
-
-
-
     for (auto block : CIter::children(function)) 
     {
         for (auto instruction : CIter::children(block)) 
         {
             auto semantic = instruction->getSemantic();
-            auto state = working->getState(instruction);
 
             auto ici = dynamic_cast<IndirectCallInstruction *>(semantic);
             auto iji = dynamic_cast<IndirectJumpInstruction *>(semantic);
@@ -1221,79 +1112,20 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
 	    std::unordered_set<UDResult> results;
             if(ici && ici->hasMemoryOperand()) 
             {
-                    IndirectCallTarget target(instruction->getAddress());
-                    target.setUnknown();
-                    icTargets.push_back(target);
-                    
-		auto indexReg = X86Register::convertToPhysical(ici->getIndexRegister());
-		auto reg = X86Register::convertToPhysical(ici->getRegister());
-		auto scale = ici->getScale();
-		auto disp = ici->getDisplacement();
-
-		InstrDumper instrdumper(instruction->getAddress(), INT_MIN);
-		instruction->getSemantic()->accept(&instrdumper);
-		LOG(1, "ICALL_MEM_OP REG " << std::dec << reg << " INDEXREG = "<< indexReg << " SCALE = " <<  ici->getScale() << std::hex << " DISP = " << ici->getDisplacement());
-		
-		std::unordered_set<UDResult> regResult;
-		std::unordered_set<UDResult> indexResult;
-
-		if(reg != -1)
-		{
-	                resolveRegister(reg, state, function, regResult);
-		}
-
-		if(indexReg != -1)
-		{
-        	        resolveRegister(indexReg, state, function, indexResult);
-		}
-                instruction->getSemantic()->accept(&instrdumper);
-
-		// disp(reg, index, scale) = value at memory address (reg + index * scale + disp)
-		if(indexReg == -1) // reg + disp
-		{
-			if(disp > 0)
-				combineWithConstant(regResult, (address_t)disp, ConstOpType::ADD, results);
-			else if(disp < 0)
-			{
-				disp = (-1) * disp;
-				combineWithConstant(regResult, (address_t)disp, ConstOpType::SUB, results);
-			}
-			else //disp = 0
-			{
-				results = regResult;
-			}
-		}
-		else		  // reg + index * scale + disp
-		{
-			// index*scale
-			std::unordered_set<UDResult> inter_result1;
-			combineWithConstant(indexResult, scale, ConstOpType::MULT, inter_result1);
-
-			// reg + (index*scale)
-			std::unordered_set<UDResult> inter_result2;
-			combineResults(inter_result1, regResult, BinaryOpType::ADD, inter_result2);
-
-			// reg + (index*scale) + disp
-			if(disp > 0)
-                                combineWithConstant(inter_result2, (address_t)disp, ConstOpType::ADD, results);
-                        else if(disp < 0)
-                        {
-                                disp = (-1) * disp;
-                                combineWithConstant(inter_result2, (address_t)disp, ConstOpType::SUB, results);
-                        }
-			else // disp = 0
-			{
-				results = inter_result2;
-			}
-		}
-		
+                // Memory-operand indirect calls were unconditionally marked unknown
+                // (forcing resolved = false below), so skip redundant backward slicing.
                 LOG(1, "ICALL_RESOLVE UNRESOLVE_MEMORY_OPERAND " << std::hex << instruction->getAddress()
                       << " " << std::dec << instruction->getAddress() << " " << function->getName());
-		////indent();
-                LOG(1, "CAUTION : UNRESOLVED IC DUE TO MEMORY OPERAND"); 
+                LOG(1, "CAUTION : UNRESOLVED IC DUE TO MEMORY OPERAND");
+                continue;
             }
             else 
             {
+                if (!working)
+                {
+                    working = df.getWorkingSet(function);
+                }
+                auto state = working->getState(instruction);
                 int reg = -1;
 		          if(ici)
 		          {
@@ -1397,12 +1229,19 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
 
 set<Function*> SyspartUtility::getFunctionByAddress(address_t addr, Module* mod)
 {
+    ensureAddrIndex();
     set<Function*> func_set;
-    bool found = false;
-
-    for(auto func : CIter::functions(mod))
+    auto it = addrToFuncs.find(addr);
+    if(it == addrToFuncs.end())
     {
-        if(func->getAddress() == addr)
+        return func_set;
+    }
+
+    bool found = false;
+    for(auto func : it->second)
+    {
+        auto func_mod = (Module*)func->getParent()->getParent();
+        if(func_mod == mod)
         {
             found = true;
             bool flag = true;
@@ -1412,44 +1251,53 @@ set<Function*> SyspartUtility::getFunctionByAddress(address_t addr, Module* mod)
                     flag = false;
             }
             if(flag)                //No duplicates found
-        {
+            {
                 func_set.insert(func);
-        }
+            }
         }
     }
 
     if(!found)
     {
-        for(auto module : CIter::children(program))
+        for(auto func : it->second)
         {
+            auto module = (Module*)func->getParent()->getParent();
             if(module->getName() == mod->getName())
                 continue;
-            for(auto func : CIter::functions(module))
+            bool flag = true;
+            for(auto f : func_set)  //To avoid duplicate function objects that refer to the same function
             {
-                if(func->getAddress() == addr)
-                {
-                    bool flag = true;
-                    for(auto f : func_set)  //To avoid duplicate function objects that refer to the same function
-                    {
-                        if((f->getName() == func->getName()) && (f->getParent()->getParent() == module))
-                            flag = false;
-                    }
-                    if(flag)                //No duplicates found
-            {
-                        func_set.insert(func);
+                if((f->getName() == func->getName()) && (f->getParent()->getParent() == module))
+                    flag = false;
             }
-                }
+            if(flag)                //No duplicates found
+            {
+                func_set.insert(func);
             }
         }
     }
     return func_set;
 }
 
+void SyspartUtility::ensureAddrIndex()
+{
+    if(addrIndexBuilt) return;
+    addrToFuncs.clear();
+    if(program != NULL)
+    {
+        for(auto module : CIter::children(program))
+        {
+            for(auto func : CIter::functions(module))
+            {
+                addrToFuncs[func->getAddress()].push_back(func);
+            }
+        }
+    }
+    addrIndexBuilt = true;
+}
+
 void SyspartUtility::initialize()
 {
-    for(auto n : ip_callgraph->nodeMap)
-    {
-        df.addUseDefFor(n.first);
-    }
-
+    addrIndexBuilt = false;
+    ensureAddrIndex();
 }

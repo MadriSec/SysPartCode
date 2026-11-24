@@ -201,6 +201,10 @@ class IPCallGraphNode
 		{
 			return indirectCalls;
 		}
+		const set<address_t>& getIndirectCallSitesRef() const
+		{
+			return indirectCalls;
+		}
 		
 		map<address_t, set<IPCallGraphNode*>> getATList(); //Get all functions which are AT
 
@@ -405,7 +409,7 @@ class IPCallGraph
 
 	set<Function*> getFunctionByAddress(address_t addr);
 	Function* getNSSFunctionByName(string name);
-	std::set<Function *> getGlobalATList()
+	const std::set<Function *>& getGlobalATList() const
 	{
 		return globalATList;
 	}
