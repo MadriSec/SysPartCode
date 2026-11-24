@@ -23,6 +23,7 @@ using namespace std::chrono;
 #include "pass/resolveplt.h"
 #include "syspartUtility.h"
 #include <climits> //For INT_MIN
+#include <limits>
 
 #undef DEBUG_GROUP
 #define DEBUG_GROUP ipcallgraph
@@ -1584,6 +1585,100 @@ void IPCallGraph::parseDataWithNoSymbols(Module *module, address_t instrAddr, Fu
     }
 }
 
+const IPCallGraph::DataSectionIndex& IPCallGraph::getOrBuildDataSectionIndex(DataSection * ds) {
+    auto it = dsIndexCache.find(ds);
+    if (it != dsIndexCache.end()) {
+        return it -> second;
+    }
+    DataSectionIndex idx;
+    size_t origIdx = 0;
+    for (auto gl: ds -> getGlobalVariables()) {
+        auto st = gl -> getAddress();
+        auto sz = gl -> getSize();
+        if (sz > 0) {
+            idx.globals.push_back({st, st + sz, st + sz, origIdx});
+        }
+        ++origIdx;
+    }
+    std::sort(idx.globals.begin(), idx.globals.end(),
+        [](const DataSectionIndex::GlobalRange& a, const DataSectionIndex::GlobalRange& b) {
+            if (a.start != b.start) return a.start < b.start;
+            return a.origIdx < b.origIdx;
+        });
+    address_t curMaxEnd = 0;
+    for (auto& g: idx.globals) {
+        if (g.end > curMaxEnd) curMaxEnd = g.end;
+        g.maxEnd = curMaxEnd;
+    }
+    for (auto dv: CIter::children(ds)) {
+        idx.dataVars.emplace_back(dv -> getAddress(), dv);
+    }
+    std::sort(idx.dataVars.begin(), idx.dataVars.end(),
+        [](const std::pair<address_t, DataVariable*>& a, const std::pair<address_t, DataVariable*>& b) {
+            return a.first < b.first;
+        });
+    auto res = dsIndexCache.emplace(ds, std::move(idx));
+    return res.first -> second;
+}
+
+void IPCallGraph::collectDataATFuncs(DataSection * ds, address_t targetAddress, set < address_t > * visited, std::vector < Function * > & outFuncs) {
+    if (visited -> count(targetAddress) != 0) {
+        return;
+    }
+    if (ds -> getType() != DataSection::TYPE_DATA) {
+        return;
+    }
+    visited -> insert(targetAddress);
+
+    const auto& idx = getOrBuildDataSectionIndex(ds);
+    address_t start_addr = targetAddress;
+    address_t end_addr = targetAddress;
+    bool isGlobal = false;
+
+    if (!idx.globals.empty()) {
+        auto ub = std::upper_bound(idx.globals.begin(), idx.globals.end(), targetAddress,
+            [](address_t addr, const DataSectionIndex::GlobalRange& r) { return addr < r.start; });
+        size_t bestOrigIdx = std::numeric_limits<size_t>::max();
+        for (ptrdiff_t i = (ub - idx.globals.begin()) - 1; i >= 0; --i) {
+            const auto& g = idx.globals[i];
+            if (g.maxEnd <= targetAddress) break;
+            if (targetAddress >= g.start && targetAddress < g.end) {
+                if (g.origIdx < bestOrigIdx) {
+                    bestOrigIdx = g.origIdx;
+                    start_addr = g.start;
+                    end_addr = g.end;
+                    isGlobal = true;
+                }
+            }
+        }
+    }
+
+    auto dvIt = std::lower_bound(idx.dataVars.begin(), idx.dataVars.end(), start_addr,
+        [](const std::pair<address_t, DataVariable*>& p, address_t addr) { return p.first < addr; });
+    for (; dvIt != idx.dataVars.end(); ++dvIt) {
+        address_t dvAddr = dvIt -> first;
+        if (isGlobal) {
+            if (dvAddr >= end_addr) break;
+        } else {
+            if (dvAddr != targetAddress) break;
+        }
+        DataVariable* dv = dvIt -> second;
+        auto dvLink = dv -> getDest();
+        if (!dvLink) continue;
+        auto dvTarget = dvLink -> getTarget();
+        if (!dvTarget) continue;
+        if (Function * global_fun = dynamic_cast < Function * > (dvTarget)) {
+            outFuncs.push_back(global_fun);
+        } else if (auto plt = dynamic_cast < PLTTrampoline * > (dvTarget)) {
+            if (auto plt_target = dynamic_cast < Function * > (plt -> getTarget())) {
+                outFuncs.push_back(plt_target);
+            }
+        } else if (DataSection * global_data = dynamic_cast < DataSection * > (dvTarget)) {
+            collectDataATFuncs(global_data, dvLink -> getTargetAddress(), visited, outFuncs);
+        }
+    }
+}
+
 void IPCallGraph::parseData(Module * module, Instruction * instr, Function * f, DataSection * ds, address_t targetAddress, set < address_t > * visited) {
     address_t instrAddr = instr -> getAddress();
     if (visited -> count(targetAddress) != 0) {
@@ -1596,88 +1691,58 @@ void IPCallGraph::parseData(Module * module, Instruction * instr, Function * f, 
     }
     LOG(20, "Search for " << std::hex << targetAddress << " from " << std::hex << instrAddr << " in DS " << ds -> getName() << " " << ds -> getType());
     LOG(20, "module is " << module -> getName());
-    visited -> insert(targetAddress);
+
+    const auto& idx = getOrBuildDataSectionIndex(ds);
     address_t start_addr = targetAddress;
     address_t end_addr = targetAddress;
     bool isGlobal = false;
-    for (auto gl: ds -> getGlobalVariables()) {
 
-        auto st = gl -> getAddress();
-        auto en = gl -> getAddress() + gl -> getSize();
-        if (targetAddress >= st && targetAddress < en) {
-            LOG(20, "Target address " << targetAddress << " is in globalvar " << gl -> getName());
-            start_addr = st;
-            end_addr = en;
-            isGlobal = true;
-            break;
+    if (!idx.globals.empty()) {
+        auto ub = std::upper_bound(idx.globals.begin(), idx.globals.end(), targetAddress,
+            [](address_t addr, const DataSectionIndex::GlobalRange& r) { return addr < r.start; });
+        size_t bestOrigIdx = std::numeric_limits<size_t>::max();
+        for (ptrdiff_t i = (ub - idx.globals.begin()) - 1; i >= 0; --i) {
+            const auto& g = idx.globals[i];
+            if (g.maxEnd <= targetAddress) break;
+            if (targetAddress >= g.start && targetAddress < g.end) {
+                if (g.origIdx < bestOrigIdx) {
+                    bestOrigIdx = g.origIdx;
+                    start_addr = g.start;
+                    end_addr = g.end;
+                    isGlobal = true;
+                }
+            }
         }
     }
-    for (auto dv: CIter::children(ds)) {
 
-        if (isGlobal) {
-            if (dv -> getAddress() >= start_addr && dv -> getAddress() < end_addr) {
-                LOG(20, "GLOBAL Variable address " << module -> getName());
-                auto dvLink = dv -> getDest();
-                if (dvLink) {
-                    auto dvTarget = dvLink -> getTarget();
-                    if (dvTarget) {
-                        auto dvTargetAddr = dvLink -> getTargetAddress();
-                        if (Function * global_fun = dynamic_cast < Function * > (dvTarget)) {
-                            LOG(20, "AT func at " << instrAddr << " in fun " << f -> getName() << " AT function " << global_fun -> getAddress() << " " << global_fun -> getName());
-                            addATFunction(instrAddr, f, global_fun);
-                            addFunctionRoot(global_fun);
-                            LOG(5, " " << std::hex << global_fun -> getAddress() << " " << global_fun -> getName() << " DATA REG SYM");
-                            globalATList.insert(global_fun);
-                        } else if (auto plt = dynamic_cast < PLTTrampoline * > (dvTarget)) {
-                            if (auto plt_target = dynamic_cast < Function * > (plt -> getTarget())) {
-                                LOG(20, "AT func at " << std::hex << instrAddr << " in fun " << f -> getName() << " AT function " << plt_target -> getAddress() << " " << plt_target -> getName());
-                                addATFunction(instrAddr, f, plt_target);
-                                addFunctionRoot(plt_target);
-                                LOG(5, " " << std::hex << plt_target -> getAddress() << " " << plt_target -> getName() << " DATA REG PLT SYM");
-                                globalATList.insert(plt_target);
-                            } else {
-                                LOG(1, "plt " << plt -> getName() << " not resolved to a function in " << f -> getName());
-                            }
-                        } else if (DataSection * global_data = dynamic_cast < DataSection * > (dvTarget)) {
-                            LOG(20, "Addr " << targetAddress << " refers to " << dvTargetAddr << endl);
-                            parseData(module, instr, f, global_data, dvTargetAddr, visited);
-                        }
-                    }
-                }
+    if (visited -> empty()) {
+        DataParseKey key{ds, start_addr, end_addr, isGlobal};
+        auto cacheIt = parsedDataATCache.find(key);
+        if (cacheIt != parsedDataATCache.end()) {
+            for (Function* fn: cacheIt -> second) {
+                addATFunction(instrAddr, f, fn);
             }
-        } else {
-            if (dv -> getAddress() == targetAddress) {
-                LOG(20, "UNGLOBAL Variable address " << ds -> getName() << " " << module -> getName() << " " << targetAddress);
-                auto dvLink = dv -> getDest();
-                if (dvLink) {
-                    auto dvTarget = dvLink -> getTarget();
-                    if (dvTarget) {
-                        auto dvTargetAddr = dvLink -> getTargetAddress();
-                        LOG(20, "DV Target Address : " << std::hex << dvTargetAddr);
-                        if (Function * global_fun = dynamic_cast < Function * > (dvTarget)) {
-                            LOG(20, "AT func at " << instrAddr << " in fun " << f -> getName() << " AT function " << global_fun -> getAddress() << " " << global_fun -> getName());
-                            addATFunction(instrAddr, f, global_fun);
-                            addFunctionRoot(global_fun);
-                            LOG(5, " " << std::hex << global_fun -> getAddress() << " " << global_fun -> getName() << " DATA REG");
-                            globalATList.insert(global_fun);
-                        } else if (auto plt = dynamic_cast < PLTTrampoline * > (dvTarget)) {
-                            if (auto plt_target = dynamic_cast < Function * > (plt -> getTarget())) {
-                                LOG(20, "AT func at " << std::hex << instrAddr << " in fun " << f -> getName() << " AT function " << plt_target -> getAddress() << " " << plt_target -> getName());
-                                addATFunction(instrAddr, f, plt_target);
-                                addFunctionRoot(plt_target);
-                                LOG(5, " " << std::hex << plt_target -> getAddress() << " " << plt_target -> getName() << " DATA REG PLT");
-                                globalATList.insert(plt_target);
-                            } else {
-                                LOG(1, "plt " << plt -> getName() << " not resolved to a function in " << f -> getName());
-                            }
-                        } else if (DataSection * global_data = dynamic_cast < DataSection * > (dvTarget)) {
-                            LOG(20, "Addr " << targetAddress << " refers to " << dvTargetAddr << endl);
-                            parseData(module, instr, f, global_data, dvTargetAddr, visited);
-                        }
-                    }
-                }
-            }
+            return;
         }
+        std::vector<Function*> collected;
+        collectDataATFuncs(ds, targetAddress, visited, collected);
+        std::sort(collected.begin(), collected.end());
+        collected.erase(std::unique(collected.begin(), collected.end()), collected.end());
+        for (Function* fn: collected) {
+            addATFunction(instrAddr, f, fn);
+            addFunctionRoot(fn);
+            globalATList.insert(fn);
+        }
+        parsedDataATCache.emplace(key, std::move(collected));
+        return;
+    }
+
+    std::vector<Function*> collected;
+    collectDataATFuncs(ds, targetAddress, visited, collected);
+    for (Function* fn: collected) {
+        addATFunction(instrAddr, f, fn);
+        addFunctionRoot(fn);
+        globalATList.insert(fn);
     }
 }
 

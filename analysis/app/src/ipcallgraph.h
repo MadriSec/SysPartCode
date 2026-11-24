@@ -320,6 +320,38 @@ class IPCallGraph
 	void generateIndirectEdgesWithTypeArmor(IPCallGraphNode* n, address_t addr, set<IPCallGraphNode*> at);
 	void parseTypeArmor();
 	void printNodeInfo();
+	struct DataSectionIndex {
+		struct GlobalRange {
+			address_t start;
+			address_t end;
+			address_t maxEnd;
+			size_t origIdx;
+		};
+		std::vector<GlobalRange> globals;
+		std::vector<std::pair<address_t, DataVariable*>> dataVars;
+	};
+	struct DataParseKey {
+		DataSection* ds;
+		address_t start;
+		address_t end;
+		bool isGlobal;
+		bool operator==(const DataParseKey& o) const {
+			return ds == o.ds && start == o.start && end == o.end && isGlobal == o.isGlobal;
+		}
+	};
+	struct DataParseKeyHash {
+		size_t operator()(const DataParseKey& k) const {
+			size_t h = std::hash<DataSection*>()(k.ds);
+			h ^= std::hash<address_t>()(k.start) + 0x9e3779b9 + (h << 6) + (h >> 2);
+			h ^= std::hash<address_t>()(k.end) + 0x9e3779b9 + (h << 6) + (h >> 2);
+			h ^= std::hash<bool>()(k.isGlobal) + 0x9e3779b9 + (h << 6) + (h >> 2);
+			return h;
+		}
+	};
+	std::unordered_map<DataSection*, DataSectionIndex> dsIndexCache;
+	std::unordered_map<DataParseKey, std::vector<Function*>, DataParseKeyHash> parsedDataATCache;
+	const DataSectionIndex& getOrBuildDataSectionIndex(DataSection* ds);
+	void collectDataATFuncs(DataSection* ds, address_t targetAddress, set<address_t>* visited, std::vector<Function*>& outFuncs);
 	std::deque<Function*> functionRoots;
 	std::unordered_set<Function*> functionRootSet;
 	vector<address_t> dataRoots;
