@@ -77,7 +77,7 @@ void IPCallGraphNode::removeCallTarget(address_t addr, IPCallGraphNode * t) {
     }
 
     auto indirIt = indirect_children.find(addr);
-    if (indirIt != indirect_children.end()); // remove unused vectors from cache
+    if (indirIt != indirect_children.end()) // remove unused vectors from cache
     {
         indirect_children[addr] = listManager.removeChild(indirIt -> second, t);
     }
@@ -810,7 +810,7 @@ void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode * n, addres
     auto module = (Module * ) n -> getFunction() -> getParent() -> getParent();
 
     bool found = false;
-    int nargs;
+    int nargs = 0;
     for (auto ic: icallNargs) {
         address_t icall_addr;
         Module * icall_mod;
@@ -849,6 +849,7 @@ void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode * n, addres
         if (nargs_at_iter == functionNargs.end()) //Don't have nargs for this function
         {
             pruned_set.insert(atexec);
+            continue;
         }
         auto nargs_at = nargs_at_iter -> second;
         if (nargs_at > nargs) //Function expects more args than what is passed through icall

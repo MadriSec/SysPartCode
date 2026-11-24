@@ -300,7 +300,10 @@ void Syspart::findDirectSyscalls()
             {
                 (s->direct_syscalls).insert(value);
                 (s->all_syscalls).insert(value);
-                bs[value]=1;
+                if(value < bs.size())
+                {
+                    bs[value]=1;
+                }
                 auto iter = who_invokes_syscalls.find(value);
                 if(iter == who_invokes_syscalls.end())
                 {
@@ -1618,7 +1621,7 @@ void Syspart::run16(bool direct, bool icanalysisFlag, bool typearmorFlag, int op
         stop = high_resolution_clock::now();
         duration = duration_cast<seconds>(stop - start);
         std::cerr << "Combined syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
-        for(int i=0; i<=combined.size(); i++)
+        for(size_t i=0; i<combined.size(); i++)
         {
                 if(combined[i] == 1)
                 {
@@ -1699,7 +1702,7 @@ void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag, int op
     	stop = high_resolution_clock::now();
     	duration = duration_cast<seconds>(stop - start);
     	std::cerr << "Combined syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
-	for(int i=0; i<=combined.size(); i++)
+	for(size_t i=0; i<combined.size(); i++)
 	{
     		if(combined[i] == 1)
 		{
