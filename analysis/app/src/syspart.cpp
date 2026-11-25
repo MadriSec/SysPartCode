@@ -162,10 +162,10 @@ Syspart::SysNode* Syspart::getSysNode(Function *f)
 {
 	if(f == NULL)
 		return NULL;
-	auto ip_node = ip_callgraph.getNode(f);
-	if(ip_node != NULL)
+	auto node_it = ip_callgraph.nodeMap.find(f);
+	if(node_it != ip_callgraph.nodeMap.end())
 	{
-		auto it = syscall_mapping.find(ip_node);
+		auto it = syscall_mapping.find(node_it->second);
 		if(it != syscall_mapping.end())
 			return it->second;
 	}
