@@ -160,15 +160,14 @@ void Syspart::populateSyscallMap()
 
 Syspart::SysNode* Syspart::getSysNode(Function *f)
 {
-	for(auto s : syscall_mapping)
+	if(f == NULL)
+		return NULL;
+	auto node_it = ip_callgraph.nodeMap.find(f);
+	if(node_it != ip_callgraph.nodeMap.end())
 	{
-        //cout<<(s.second)->func->getAddress()<<" "<<f->getAddress()<<endl;
-		if((s.second)->func == f)
-			return s.second;
-        if(((s.second)->func->getAddress() == f->getAddress()) && ((s.second)->func->getName() == f->getName()))
-        {
-           return s.second;
-        }
+		auto it = syscall_mapping.find(node_it->second);
+		if(it != syscall_mapping.end())
+			return it->second;
 	}
 	return NULL;
 }
@@ -300,7 +299,10 @@ void Syspart::findDirectSyscalls()
             {
                 (s->direct_syscalls).insert(value);
                 (s->all_syscalls).insert(value);
-                bs[value]=1;
+                if(value < bs.size())
+                {
+                    bs[value]=1;
+                }
                 auto iter = who_invokes_syscalls.find(value);
                 if(iter == who_invokes_syscalls.end())
                 {
@@ -495,38 +497,122 @@ void Syspart::printDisass(string fname)
 
 void Syspart::findDerived4()
 {
+	std::vector<IPCallGraphNode*> idToNode;
+	std::vector<SysNode*> idToSysNode;
+	std::unordered_map<IPCallGraphNode*, uint32_t> nodeToId;
+	idToNode.reserve(ip_callgraph.nodeMap.size());
+	idToSysNode.reserve(ip_callgraph.nodeMap.size());
+	nodeToId.reserve(ip_callgraph.nodeMap.size());
+
+	for(const auto& i : ip_callgraph.nodeMap)
+	{
+		auto cur_node = i.second;
+		auto cur_iter = syscall_mapping.find(cur_node);
+		if(cur_iter == syscall_mapping.end())
+			continue;
+		uint32_t id = static_cast<uint32_t>(idToNode.size());
+		nodeToId[cur_node] = id;
+		idToNode.push_back(cur_node);
+		idToSysNode.push_back(cur_iter->second);
+	}
+
+	const uint32_t N = static_cast<uint32_t>(idToNode.size());
+	if(N == 0)
+		return;
+
+	std::vector<std::bitset<600>> syscalls(N);
+	for(uint32_t u = 0; u < N; ++u)
+	{
+		syscalls[u] = (idToSysNode[u]->syscall_info)[idToSysNode[u]];
+	}
+
+	const auto& allATListPtr = ip_callgraph.getAllATListPtr();
+	std::vector<uint32_t> atIds;
+	const auto& allATNodes = ip_callgraph.getAllATNodes();
+	atIds.reserve(allATNodes.size());
+	for(auto* atNode : allATNodes)
+	{
+		auto it = nodeToId.find(atNode);
+		if(it != nodeToId.end())
+		{
+			atIds.push_back(it->second);
+		}
+	}
+
+	std::vector<uint8_t> hasAllAT(N, 0);
+	std::vector<std::vector<uint32_t>> adj(N);
+	for(uint32_t u = 0; u < N; ++u)
+	{
+		auto* cur_node = idToNode[u];
+		auto& targets = adj[u];
+		for(const auto& c : cur_node->getDirectChildrenRef())
+		{
+			for(auto* child : *(c.second))
+			{
+				auto it = nodeToId.find(child);
+				if(it != nodeToId.end())
+				{
+					targets.push_back(it->second);
+				}
+			}
+		}
+		for(const auto& c : cur_node->getIndirectChildrenRef())
+		{
+			if(allATListPtr && c.second == allATListPtr)
+			{
+				hasAllAT[u] = 1;
+				continue;
+			}
+			for(auto* child : *(c.second))
+			{
+				auto it = nodeToId.find(child);
+				if(it != nodeToId.end())
+				{
+					targets.push_back(it->second);
+				}
+			}
+		}
+		if(targets.size() > 1)
+		{
+			std::sort(targets.begin(), targets.end());
+			targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
+		}
+	}
+
 	bool changed_in_pass = true;
-	int pass_count = 0;
 
 	while(changed_in_pass)
 	{
 		changed_in_pass = false;
-		pass_count++;
 
-		for(auto i : ip_callgraph.nodeMap)
+		std::bitset<600> at_union;
+		for(uint32_t at_id : atIds)
 		{
-			auto cur_node = i.second;
-			auto cur_iter = syscall_mapping.find(cur_node);
-			if(cur_iter == syscall_mapping.end())
-				continue;
-			auto cur_sys_node = cur_iter->second;
-			std::bitset<600> current_syscalls = (cur_sys_node->syscall_info)[cur_sys_node];
-			//cout<<(i.first)->getName()<<" "<<current_syscalls.to_string()<<endl;
-			for(auto child : cur_node->getAllCallTargets())
+			at_union |= syscalls[at_id];
+		}
+
+		for(uint32_t u = 0; u < N; ++u)
+		{
+			std::bitset<600> current_syscalls = syscalls[u];
+			if(hasAllAT[u])
 			{
-				auto child_iter = syscall_mapping.find(child);
-				if(child_iter == syscall_mapping.end())
-					continue;
-				auto child_node = child_iter->second;
-				current_syscalls |= (child_node->syscall_info)[child_node];
+				current_syscalls |= at_union;
 			}
-			if( current_syscalls != (cur_sys_node->syscall_info)[cur_sys_node])
+			for(uint32_t v : adj[u])
 			{
-				(cur_sys_node->syscall_info)[cur_sys_node] = current_syscalls;
+				current_syscalls |= syscalls[v];
+			}
+			if(current_syscalls != syscalls[u])
+			{
+				syscalls[u] = current_syscalls;
 				changed_in_pass = true;
-				//cout<<"CHANGED PASS "<<(i.first)->getName()<<endl;
 			}
 		}
+	}
+
+	for(uint32_t u = 0; u < N; ++u)
+	{
+		(idToSysNode[u]->syscall_info)[idToSysNode[u]] = syscalls[u];
 	}
 }
 
@@ -1618,7 +1704,7 @@ void Syspart::run16(bool direct, bool icanalysisFlag, bool typearmorFlag, int op
         stop = high_resolution_clock::now();
         duration = duration_cast<seconds>(stop - start);
         std::cerr << "Combined syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
-        for(int i=0; i<=combined.size(); i++)
+        for(size_t i=0; i<combined.size(); i++)
         {
                 if(combined[i] == 1)
                 {
@@ -1699,7 +1785,7 @@ void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag, int op
     	stop = high_resolution_clock::now();
     	duration = duration_cast<seconds>(stop - start);
     	std::cerr << "Combined syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
-	for(int i=0; i<=combined.size(); i++)
+	for(size_t i=0; i<combined.size(); i++)
 	{
     		if(combined[i] == 1)
 		{

@@ -23,6 +23,7 @@ using namespace std::chrono;
 #include "pass/resolveplt.h"
 #include "syspartUtility.h"
 #include <climits> //For INT_MIN
+#include <limits>
 
 #undef DEBUG_GROUP
 #define DEBUG_GROUP ipcallgraph
@@ -60,6 +61,17 @@ void IPCallGraphNode::insertCallTargetSet(address_t iaddr, bool isDirect, set < 
     }
 }
 
+void IPCallGraphNode::insertSharedIndirectTargetList(address_t iaddr, const ChildListPtr& sharedList) {
+    auto it = indirect_children.find(iaddr);
+    if (it == indirect_children.end()) {
+        indirect_children[iaddr] = sharedList;
+    } else if (it->second != sharedList) {
+        std::vector<IPCallGraphNode*> merged(*it->second);
+        merged.insert(merged.end(), sharedList->begin(), sharedList->end());
+        indirect_children[iaddr] = listManager.getOrCreate(merged);
+    }
+}
+
 void IPCallGraphNode::removeAllCallTargets(IPCallGraphNode * t) {
     for (auto & [addr, childListPtr]: direct_children) {
         direct_children[addr] = listManager.removeChild(childListPtr, t);
@@ -77,14 +89,14 @@ void IPCallGraphNode::removeCallTarget(address_t addr, IPCallGraphNode * t) {
     }
 
     auto indirIt = indirect_children.find(addr);
-    if (indirIt != indirect_children.end()); // remove unused vectors from cache
+    if (indirIt != indirect_children.end()) // remove unused vectors from cache
     {
         indirect_children[addr] = listManager.removeChild(indirIt -> second, t);
     }
 }
 
 void IPCallGraphNode::removeParent(IPCallGraphNode * p) {
-    address_t addr_to_be_removed;
+    address_t addr_to_be_removed = 0;
     int flag = 0;
     for (auto parent_iter: parent) {
         auto par = parent_iter.second;
@@ -98,6 +110,9 @@ void IPCallGraphNode::removeParent(IPCallGraphNode * p) {
         LOG(20, "Removed parent " << p -> getFunction() -> getName() << " from " << this -> func -> getName());
 
     }
+    if (sharedUnresolvedCallers != nullptr && sharedUnresolvedCallers->count(p) != 0) {
+        removedUnresolvedCallers.insert(p);
+    }
 }
 
 void IPCallGraphNode::removeParent(address_t addr, IPCallGraphNode * p) {
@@ -107,7 +122,9 @@ void IPCallGraphNode::removeParent(address_t addr, IPCallGraphNode * p) {
         LOG(20, "Removed " << p -> getFunction() -> getName() << " at " << addr << " from " << this -> func -> getName());
 
     }
-
+    if (sharedUnresolvedCallSites != nullptr) {
+        removedUnresolvedCallSites.emplace(addr, p);
+    }
 }
 
 void IPCallGraphNode::setFunction(Function * f) {
@@ -126,14 +143,17 @@ void IPCallGraphNode::insertParent(address_t addr, IPCallGraphNode * p, bool typ
 
 set < IPCallGraphNode * > IPCallGraphNode::getAllCallTargets() {
     set < IPCallGraphNode * > s;
-    for (auto & c: direct_children) {
-        auto & vec = * (c.second); // dereference shared_ptr
+    std::unordered_set<const std::vector<IPCallGraphNode*>*> seenLists;
+    for (const auto & c: direct_children) {
+        if (!seenLists.insert(c.second.get()).second) continue;
+        const auto & vec = * (c.second); // dereference shared_ptr
         s.insert(vec.begin(), vec.end()); // insert all elements into set
     }
 
     // Indirect children
-    for (auto & c: indirect_children) {
-        auto & vec = * (c.second);
+    for (const auto & c: indirect_children) {
+        if (!seenLists.insert(c.second.get()).second) continue;
+        const auto & vec = * (c.second);
         s.insert(vec.begin(), vec.end());
     }
     return s;
@@ -161,7 +181,6 @@ void IPCallGraph::addFunctionRoot(Function * func) {
     auto start_iter = nodeMap.find(func);
     if (start_iter == nodeMap.end()) {
         IPCallGraphNode * start_node = new IPCallGraphNode(func, listManager);
-        df.getWorkingSet(func);
         nodeMap[func] = start_node;
     }
 }
@@ -173,7 +192,6 @@ void IPCallGraph::setRoot(Function * func) {
     auto start_iter = nodeMap.find(func);
     if (start_iter == nodeMap.end()) {
         IPCallGraphNode * start_node = new IPCallGraphNode(func, listManager);
-        df.getWorkingSet(func);
         nodeMap[func] = start_node;
     }
 
@@ -229,7 +247,6 @@ void IPCallGraph::addEdge(address_t addr, Function * start, Function * end, bool
 
     if (start_iter == nodeMap.end()) {
         start_node = new IPCallGraphNode(start, listManager);
-        df.getWorkingSet(start);
         nodeMap[start] = start_node;
 
     } else
@@ -237,7 +254,6 @@ void IPCallGraph::addEdge(address_t addr, Function * start, Function * end, bool
 
     if (end_iter == nodeMap.end()) {
         end_node = new IPCallGraphNode(end, listManager);
-        df.getWorkingSet(end);
 
         nodeMap[end] = end_node;
     } else
@@ -256,7 +272,6 @@ void IPCallGraph::addATFunction(address_t addr, Function * start, Function * ATf
 
     if (start_iter == nodeMap.end()) {
         start_node = new IPCallGraphNode(start, listManager);
-        df.getWorkingSet(start);
         LOG(15, start << " " << start_node << " " << std::hex << start -> getAddress() << " " << start -> getName());
         nodeMap[start] = start_node;
     } else
@@ -264,7 +279,6 @@ void IPCallGraph::addATFunction(address_t addr, Function * start, Function * ATf
 
     if (ATfunc_iter == nodeMap.end()) {
         ATfunc_node = new IPCallGraphNode(ATfunc, listManager);
-        df.getWorkingSet(ATfunc);
         LOG(15, ATfunc << " " << ATfunc_node << " " << std::hex << ATfunc -> getAddress() << " " << ATfunc -> getName());
 
         nodeMap[ATfunc] = ATfunc_node;
@@ -280,7 +294,6 @@ void IPCallGraph::addIndirectSource(address_t addr, Function * func) {
     IPCallGraphNode * n;
     if (f_iter == nodeMap.end()) {
         n = new IPCallGraphNode(func, listManager);
-        df.getWorkingSet(func);
         LOG(15, func << " " << n << " " << std::hex << func -> getAddress() << " " << func -> getName());
 
         nodeMap[func] = n;
@@ -662,91 +675,36 @@ void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n) {
 */
 
 void IPCallGraph::generateIndirectEdges(IPCallGraphNode * n) {
-    auto ics = n -> getIndirectCallSites();
-    set < IPCallGraphNode * > s = allAT;
-    /*
-    for(auto f : globalATList)
-    {
-    	auto node_iter = nodeMap.find(f);
-    	IPCallGraphNode* node_f;
-    	if(node_iter == nodeMap.end())
-    	{
-    		node_f = new IPCallGraphNode(f, listManager);
-    		df.getWorkingSet(f);
-    		LOG(15, f<<" "<<node_f<<" "<<std::hex<<f->getAddress()<<" "<<f->getName());
-    		nodeMap[f] = node_f;
-    	}
-    	else
-    		node_f = (node_iter)->second;
-    	s.insert(node_f);
-    }
-    */
+    const auto& ics = n -> getIndirectCallSitesRef();
+    if (ics.empty()) return;
+
     auto cur_func = n -> getFunction();
     for (auto bl: CIter::children(cur_func)) {
         for (auto instr: CIter::children(bl)) {
             auto addr = instr -> getAddress();
             if (ics.count(addr) == 0) //Not an indirect call
                 continue;
-            if (auto ici = dynamic_cast < IndirectCallInstruction * > (instr -> getSemantic())) {
-                nicalls++;
-                if (icanalysisFlag) {
-                    if (n -> isIcallResolved(addr)) {
-                        resolvedIcalls++;
-                        auto inc = n -> getIndirectChildren();
-                        for (auto i: inc) {
-                            if (i.first != addr)
-                                continue;
-
-                            for (auto ict: * (i.second)) {
-                                totResolvedIcTarget++;
-                            }
-
-                        }
-                        continue;
-                    }
-
-                }
-                n -> setIcallResolved(addr, false);
-
-                if (!typeArmorFlag) //If TypeArmor not enabled
-                {
-                    n -> insertCallTargetSet(addr, false, s);
-                    for (auto node_f: s) {
-                        node_f -> insertParent(addr, n, false);
+            nicalls++;
+            if (icanalysisFlag) {
+                if (n -> isIcallResolved(addr)) {
+                    resolvedIcalls++;
+                    const auto& inc = n -> getIndirectChildrenRef();
+                    auto incIt = inc.find(addr);
+                    if (incIt != inc.end()) {
+                        totResolvedIcTarget += incIt -> second -> size();
                     }
                     continue;
-                } else
-                    generateIndirectEdgesWithTypeArmor(n, addr, s);
-            } else //Not an indirect call instruction, but can be datalinked instruction or an indirect jump instruction
+                }
+            }
+            n -> setIcallResolved(addr, false);
+
+            if (!typeArmorFlag) //If TypeArmor not enabled
             {
-                nicalls++;
-                if (icanalysisFlag) {
-                    if (n -> isIcallResolved(addr)) {
-                        resolvedIcalls++;
-                        auto inc = n -> getIndirectChildren();
-                        for (auto i: inc) {
-                            if (i.first != addr)
-                                continue;
-                            for (auto ict: * (i.second)) {
-                                totResolvedIcTarget++;
-                            }
-
-                        }
-                        continue;
-                    }
-
-                }
-
-                n -> setIcallResolved(addr, false);
-                if (!typeArmorFlag) //If TypeArmor not enabled
-                {
-                    n -> insertCallTargetSet(addr, false, s);
-                    for (auto node_f: s) {
-                        node_f -> insertParent(addr, n, false);
-                    }
-                    continue;
-                } else
-                    generateIndirectEdgesWithTypeArmor(n, addr, s);
+                n -> insertSharedIndirectTargetList(addr, allATListPtr);
+                unresolvedIndirectCallSites.emplace_back(addr, n);
+                unresolvedIndirectCallers.insert(n);
+            } else {
+                generateIndirectEdgesWithTypeArmor(n, addr, allAT);
             }
         }
     }
@@ -806,11 +764,11 @@ void IPCallGraph::pruneIndirectEdges(IPCallGraphNode * node) {
     }
 }
 
-void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode * n, address_t addr, set < IPCallGraphNode * > at) {
+void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode * n, address_t addr, const set < IPCallGraphNode * >& at) {
     auto module = (Module * ) n -> getFunction() -> getParent() -> getParent();
 
     bool found = false;
-    int nargs;
+    int nargs = 0;
     for (auto ic: icallNargs) {
         address_t icall_addr;
         Module * icall_mod;
@@ -824,10 +782,9 @@ void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode * n, addres
     if (!found) //Couldn't find nargs for this icall
     {
         //LOG(1,"UNRESOLVED TA ICALL "<<std::hex<<addr<<" "<<module->getName());
-        n -> insertCallTargetSet(addr, false, at);
-        for (auto node_f: at) {
-            node_f -> insertParent(addr, n, false);
-        }
+        n -> insertSharedIndirectTargetList(addr, allATListPtr);
+        unresolvedIndirectCallSites.emplace_back(addr, n);
+        unresolvedIndirectCallers.insert(n);
         totTypeArmorTarget += at.size();
 
         return;
@@ -849,6 +806,7 @@ void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode * n, addres
         if (nargs_at_iter == functionNargs.end()) //Don't have nargs for this function
         {
             pruned_set.insert(atexec);
+            continue;
         }
         auto nargs_at = nargs_at_iter -> second;
         if (nargs_at > nargs) //Function expects more args than what is passed through icall
@@ -1590,6 +1548,100 @@ void IPCallGraph::parseDataWithNoSymbols(Module *module, address_t instrAddr, Fu
     }
 }
 
+const IPCallGraph::DataSectionIndex& IPCallGraph::getOrBuildDataSectionIndex(DataSection * ds) {
+    auto it = dsIndexCache.find(ds);
+    if (it != dsIndexCache.end()) {
+        return it -> second;
+    }
+    DataSectionIndex idx;
+    size_t origIdx = 0;
+    for (auto gl: ds -> getGlobalVariables()) {
+        auto st = gl -> getAddress();
+        auto sz = gl -> getSize();
+        if (sz > 0) {
+            idx.globals.push_back({st, st + sz, st + sz, origIdx});
+        }
+        ++origIdx;
+    }
+    std::sort(idx.globals.begin(), idx.globals.end(),
+        [](const DataSectionIndex::GlobalRange& a, const DataSectionIndex::GlobalRange& b) {
+            if (a.start != b.start) return a.start < b.start;
+            return a.origIdx < b.origIdx;
+        });
+    address_t curMaxEnd = 0;
+    for (auto& g: idx.globals) {
+        if (g.end > curMaxEnd) curMaxEnd = g.end;
+        g.maxEnd = curMaxEnd;
+    }
+    for (auto dv: CIter::children(ds)) {
+        idx.dataVars.emplace_back(dv -> getAddress(), dv);
+    }
+    std::sort(idx.dataVars.begin(), idx.dataVars.end(),
+        [](const std::pair<address_t, DataVariable*>& a, const std::pair<address_t, DataVariable*>& b) {
+            return a.first < b.first;
+        });
+    auto res = dsIndexCache.emplace(ds, std::move(idx));
+    return res.first -> second;
+}
+
+void IPCallGraph::collectDataATFuncs(DataSection * ds, address_t targetAddress, set < address_t > * visited, std::vector < Function * > & outFuncs) {
+    if (visited -> count(targetAddress) != 0) {
+        return;
+    }
+    if (ds -> getType() != DataSection::TYPE_DATA) {
+        return;
+    }
+    visited -> insert(targetAddress);
+
+    const auto& idx = getOrBuildDataSectionIndex(ds);
+    address_t start_addr = targetAddress;
+    address_t end_addr = targetAddress;
+    bool isGlobal = false;
+
+    if (!idx.globals.empty()) {
+        auto ub = std::upper_bound(idx.globals.begin(), idx.globals.end(), targetAddress,
+            [](address_t addr, const DataSectionIndex::GlobalRange& r) { return addr < r.start; });
+        size_t bestOrigIdx = std::numeric_limits<size_t>::max();
+        for (ptrdiff_t i = (ub - idx.globals.begin()) - 1; i >= 0; --i) {
+            const auto& g = idx.globals[i];
+            if (g.maxEnd <= targetAddress) break;
+            if (targetAddress >= g.start && targetAddress < g.end) {
+                if (g.origIdx < bestOrigIdx) {
+                    bestOrigIdx = g.origIdx;
+                    start_addr = g.start;
+                    end_addr = g.end;
+                    isGlobal = true;
+                }
+            }
+        }
+    }
+
+    auto dvIt = std::lower_bound(idx.dataVars.begin(), idx.dataVars.end(), start_addr,
+        [](const std::pair<address_t, DataVariable*>& p, address_t addr) { return p.first < addr; });
+    for (; dvIt != idx.dataVars.end(); ++dvIt) {
+        address_t dvAddr = dvIt -> first;
+        if (isGlobal) {
+            if (dvAddr >= end_addr) break;
+        } else {
+            if (dvAddr != targetAddress) break;
+        }
+        DataVariable* dv = dvIt -> second;
+        auto dvLink = dv -> getDest();
+        if (!dvLink) continue;
+        auto dvTarget = dvLink -> getTarget();
+        if (!dvTarget) continue;
+        if (Function * global_fun = dynamic_cast < Function * > (dvTarget)) {
+            outFuncs.push_back(global_fun);
+        } else if (auto plt = dynamic_cast < PLTTrampoline * > (dvTarget)) {
+            if (auto plt_target = dynamic_cast < Function * > (plt -> getTarget())) {
+                outFuncs.push_back(plt_target);
+            }
+        } else if (DataSection * global_data = dynamic_cast < DataSection * > (dvTarget)) {
+            collectDataATFuncs(global_data, dvLink -> getTargetAddress(), visited, outFuncs);
+        }
+    }
+}
+
 void IPCallGraph::parseData(Module * module, Instruction * instr, Function * f, DataSection * ds, address_t targetAddress, set < address_t > * visited) {
     address_t instrAddr = instr -> getAddress();
     if (visited -> count(targetAddress) != 0) {
@@ -1602,88 +1654,58 @@ void IPCallGraph::parseData(Module * module, Instruction * instr, Function * f, 
     }
     LOG(20, "Search for " << std::hex << targetAddress << " from " << std::hex << instrAddr << " in DS " << ds -> getName() << " " << ds -> getType());
     LOG(20, "module is " << module -> getName());
-    visited -> insert(targetAddress);
+
+    const auto& idx = getOrBuildDataSectionIndex(ds);
     address_t start_addr = targetAddress;
     address_t end_addr = targetAddress;
     bool isGlobal = false;
-    for (auto gl: ds -> getGlobalVariables()) {
 
-        auto st = gl -> getAddress();
-        auto en = gl -> getAddress() + gl -> getSize();
-        if (targetAddress >= st && targetAddress < en) {
-            LOG(20, "Target address " << targetAddress << " is in globalvar " << gl -> getName());
-            start_addr = st;
-            end_addr = en;
-            isGlobal = true;
-            break;
+    if (!idx.globals.empty()) {
+        auto ub = std::upper_bound(idx.globals.begin(), idx.globals.end(), targetAddress,
+            [](address_t addr, const DataSectionIndex::GlobalRange& r) { return addr < r.start; });
+        size_t bestOrigIdx = std::numeric_limits<size_t>::max();
+        for (ptrdiff_t i = (ub - idx.globals.begin()) - 1; i >= 0; --i) {
+            const auto& g = idx.globals[i];
+            if (g.maxEnd <= targetAddress) break;
+            if (targetAddress >= g.start && targetAddress < g.end) {
+                if (g.origIdx < bestOrigIdx) {
+                    bestOrigIdx = g.origIdx;
+                    start_addr = g.start;
+                    end_addr = g.end;
+                    isGlobal = true;
+                }
+            }
         }
     }
-    for (auto dv: CIter::children(ds)) {
 
-        if (isGlobal) {
-            if (dv -> getAddress() >= start_addr && dv -> getAddress() < end_addr) {
-                LOG(20, "GLOBAL Variable address " << module -> getName());
-                auto dvLink = dv -> getDest();
-                if (dvLink) {
-                    auto dvTarget = dvLink -> getTarget();
-                    if (dvTarget) {
-                        auto dvTargetAddr = dvLink -> getTargetAddress();
-                        if (Function * global_fun = dynamic_cast < Function * > (dvTarget)) {
-                            LOG(20, "AT func at " << instrAddr << " in fun " << f -> getName() << " AT function " << global_fun -> getAddress() << " " << global_fun -> getName());
-                            addATFunction(instrAddr, f, global_fun);
-                            addFunctionRoot(global_fun);
-                            LOG(5, " " << std::hex << global_fun -> getAddress() << " " << global_fun -> getName() << " DATA REG SYM");
-                            globalATList.insert(global_fun);
-                        } else if (auto plt = dynamic_cast < PLTTrampoline * > (dvTarget)) {
-                            if (auto plt_target = dynamic_cast < Function * > (plt -> getTarget())) {
-                                LOG(20, "AT func at " << std::hex << instrAddr << " in fun " << f -> getName() << " AT function " << plt_target -> getAddress() << " " << plt_target -> getName());
-                                addATFunction(instrAddr, f, plt_target);
-                                addFunctionRoot(plt_target);
-                                LOG(5, " " << std::hex << plt_target -> getAddress() << " " << plt_target -> getName() << " DATA REG PLT SYM");
-                                globalATList.insert(plt_target);
-                            } else {
-                                LOG(1, "plt " << plt -> getName() << " not resolved to a function in " << f -> getName());
-                            }
-                        } else if (DataSection * global_data = dynamic_cast < DataSection * > (dvTarget)) {
-                            LOG(20, "Addr " << targetAddress << " refers to " << dvTargetAddr << endl);
-                            parseData(module, instr, f, global_data, dvTargetAddr, visited);
-                        }
-                    }
-                }
+    if (visited -> empty()) {
+        DataParseKey key{ds, start_addr, end_addr, isGlobal};
+        auto cacheIt = parsedDataATCache.find(key);
+        if (cacheIt != parsedDataATCache.end()) {
+            for (Function* fn: cacheIt -> second) {
+                addATFunction(instrAddr, f, fn);
             }
-        } else {
-            if (dv -> getAddress() == targetAddress) {
-                LOG(20, "UNGLOBAL Variable address " << ds -> getName() << " " << module -> getName() << " " << targetAddress);
-                auto dvLink = dv -> getDest();
-                if (dvLink) {
-                    auto dvTarget = dvLink -> getTarget();
-                    if (dvTarget) {
-                        auto dvTargetAddr = dvLink -> getTargetAddress();
-                        LOG(20, "DV Target Address : " << std::hex << dvTargetAddr);
-                        if (Function * global_fun = dynamic_cast < Function * > (dvTarget)) {
-                            LOG(20, "AT func at " << instrAddr << " in fun " << f -> getName() << " AT function " << global_fun -> getAddress() << " " << global_fun -> getName());
-                            addATFunction(instrAddr, f, global_fun);
-                            addFunctionRoot(global_fun);
-                            LOG(5, " " << std::hex << global_fun -> getAddress() << " " << global_fun -> getName() << " DATA REG");
-                            globalATList.insert(global_fun);
-                        } else if (auto plt = dynamic_cast < PLTTrampoline * > (dvTarget)) {
-                            if (auto plt_target = dynamic_cast < Function * > (plt -> getTarget())) {
-                                LOG(20, "AT func at " << std::hex << instrAddr << " in fun " << f -> getName() << " AT function " << plt_target -> getAddress() << " " << plt_target -> getName());
-                                addATFunction(instrAddr, f, plt_target);
-                                addFunctionRoot(plt_target);
-                                LOG(5, " " << std::hex << plt_target -> getAddress() << " " << plt_target -> getName() << " DATA REG PLT");
-                                globalATList.insert(plt_target);
-                            } else {
-                                LOG(1, "plt " << plt -> getName() << " not resolved to a function in " << f -> getName());
-                            }
-                        } else if (DataSection * global_data = dynamic_cast < DataSection * > (dvTarget)) {
-                            LOG(20, "Addr " << targetAddress << " refers to " << dvTargetAddr << endl);
-                            parseData(module, instr, f, global_data, dvTargetAddr, visited);
-                        }
-                    }
-                }
-            }
+            return;
         }
+        std::vector<Function*> collected;
+        collectDataATFuncs(ds, targetAddress, visited, collected);
+        std::sort(collected.begin(), collected.end());
+        collected.erase(std::unique(collected.begin(), collected.end()), collected.end());
+        for (Function* fn: collected) {
+            addATFunction(instrAddr, f, fn);
+            addFunctionRoot(fn);
+            globalATList.insert(fn);
+        }
+        parsedDataATCache.emplace(key, std::move(collected));
+        return;
+    }
+
+    std::vector<Function*> collected;
+    collectDataATFuncs(ds, targetAddress, visited, collected);
+    for (Function* fn: collected) {
+        addATFunction(instrAddr, f, fn);
+        addFunctionRoot(fn);
+        globalATList.insert(fn);
     }
 }
 
@@ -1817,12 +1839,14 @@ void IPCallGraph::generate() {
 
     }
     start = high_resolution_clock::now();
+    allAT.clear();
+    unresolvedIndirectCallSites.clear();
+    unresolvedIndirectCallers.clear();
     for (auto f: globalATList) {
         auto node_iter = nodeMap.find(f);
         IPCallGraphNode * node_f;
         if (node_iter == nodeMap.end()) {
             node_f = new IPCallGraphNode(f, listManager);
-            df.getWorkingSet(f);
             LOG(15, f << " " << node_f << " " << std::hex << f -> getAddress() << " " << f -> getName());
             nodeMap[f] = node_f;
         } else {
@@ -1830,6 +1854,12 @@ void IPCallGraph::generate() {
         }
 
         allAT.insert(node_f);
+    }
+
+    std::vector<IPCallGraphNode*> allATVec(allAT.begin(), allAT.end());
+    allATListPtr = listManager.getOrCreate(allATVec);
+    for (auto* node_f: allAT) {
+        node_f -> setAllATParentHub(&unresolvedIndirectCallSites, &unresolvedIndirectCallers);
     }
 
     for (auto n: nodeMap) {

@@ -191,6 +191,9 @@ class SyspartUtility
 		int reg_count=0;
 		int stack_depth=0;
 		DataFlow df;
+		std::unordered_map<address_t, std::vector<Function*>> addrToFuncs;
+		bool addrIndexBuilt = false;
+		void ensureAddrIndex();
 
 		void getArgumentsPassedToFunction_helper(Function* func, int reg, std::unordered_set<UDResult>& results_out);
 	    	void findRegDef_helper(Function* func, UDState *state, int reg, std::unordered_set<UDResult>& results_out);
