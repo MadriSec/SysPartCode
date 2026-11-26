@@ -118,7 +118,7 @@ Where:
 - `$STARTFILE` contains one or more start functions.
 - `--log` is optional and records paths from the start functions to system calls in `$OUT/logfile.txt`.
 
-The script writes the callgraph and reachable system calls to separate files in the output directory. Run `src/scripts/compute_syscalls.sh --help` for details about the script and its output files.
+The script writes `callgraph.json` and `syscalls.txt` for the supplied start functions. To generate the JSON policy for a specific point in a serving loop, see [Find system calls from `main()` and the main loop](#find-system-calls-from-main-and-the-main-loop).
 
 This workflow does not produce results for dynamically loaded libraries. See [Dynamic library profiling](#dynamic-library-profiling).
 
@@ -253,7 +253,9 @@ Egalito statically analyzes the server binary and its dependent libraries. It di
 cd analysis/app
 ./loops $BINARY > $OUTDIR/loops_output.out
 grep -v '^FUNC' $OUTDIR/loops_output.out > $OUTDIR/loops.out
+grep '^FUNC' "$OUTDIR/loops_output.out" > "$OUTDIR/functions.out"
 ```
+`loops.out` is the input to Pin. `parse_pinout.sh` uses `functions.out` to look up function start addresses.
 
 #### Find the dominant loop dynamically
 
@@ -296,7 +298,7 @@ This produces `$OUTDIR/pin.out`, with one line for the serving phase of each ser
 
 ### Find system calls from `main()` and the main loop
 
-To find system calls reachable from a program point at address `$addr` within function `$func`:
+Use the function name `$func` and loop entry address `$addr` from `$OUTDIR/pin.out` to compute the system calls reachable from that point. The `JSON` line contains the policy consumed by [enforcement](#enforce-a-system-call-filter).
 
 ```bash
 ./syspart -p $BINARY -i -s main -a 2,$addr,$func > syscalls.out
@@ -332,7 +334,7 @@ cd ../filter
 make
 ```
 
-These commands create `sysfilter.so`, which contains the system call filter.
+These commands create `enforcement/libsyspart.so`, which contains the system call filter.
 
 #### Insert the filter into a binary
 
@@ -341,7 +343,7 @@ Build the enforcement component and transform the binary at the partition bounda
 ```bash
 cd enforcement
 make
-./sysenforce $BINARY <func_name> <partition_addr> $OUTPUT_BINARY sysfilter.so install_filter
+./sysenforce $BINARY <func_name> <partition_addr> $OUTPUT_BINARY libsyspart.so install_filter
 ```
 
 The `(<func_name>, <partition_addr>)` pairs come from `$OUTDIR/pin.out` and must match the values used to produce the JSON file containing the allowed system calls. The command produces `$OUTPUT_BINARY` with the filter installed by invoking `install_filter()` from `libsyspart.so` at the partition boundary.

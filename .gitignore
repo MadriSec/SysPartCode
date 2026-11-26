@@ -12,3 +12,4 @@ enforcement/build_x86_64/
 analysis/app/loops
 analysis/app/syspart
 enforcement/sysenforce
+audit-out/*

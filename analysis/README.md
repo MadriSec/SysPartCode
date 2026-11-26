@@ -17,6 +17,7 @@ The `analysis/` directory contains everything needed to statically and dynamical
 ```mermaid
 flowchart TD
     BIN["Target ELF Binary + Shared Libraries"]
+    STARTS["File with start functions"]
 
     subgraph StaticCore["Core Static Analysis (analysis/app)"]
         SYSPART["./syspart (FCG, AT pruning, VFA, Syscalls, NSS, NonReturn)"]
@@ -25,7 +26,7 @@ flowchart TD
 
     subgraph DynamicProfile["Dynamic Profiling"]
         PIN["Pintool: timeofouterloop.so"]
-        DL_DYN["LD_PRELOAD (libmydl.so) / LD_AUDIT (libaudit.so)"]
+        DL_DYN["LD_PRELOAD / LD_AUDIT report runtime library and symbol names"]
     end
 
     subgraph Scripts["Scripts & DL Analysis"]
@@ -39,14 +40,16 @@ flowchart TD
     BIN --> SYSPART
     BIN --> LOOPS
     LOOPS -->|"loops.out"| PIN
+    LOOPS -->|"functions.out"| PARSE_PIN
     PIN -->|"per-thread <tid>_<pid>"| PARSE_PIN
-    PARSE_PIN -->|"(func_name, partition_addr)"| SYSPART
+    PARSE_PIN -->|"loop function and entry address for mode 2"| SYSPART
     BIN --> DL_STATIC
-    DL_STATIC -->|"syspart -a 6"| SYSPART
-    DL_STATIC -->|"matched lib/sym"| SYSPART
+    DL_STATIC -->|"invokes mode 6 to resolve arguments"| SYSPART
+    DL_STATIC -->|"libraries_matching_syms.txt can feed mode 12"| SYSPART
     BIN --> DL_DYN
-    SYSPART -->|"mode 23/24/25"| COMPUTE
-    SYSPART -->|"mode 2 -> syscalls.json"| ENFORCE
+    STARTS --> COMPUTE
+    SYSPART -->|"call graph, direct syscalls, and function addresses from modes 23/24/25"| COMPUTE
+    SYSPART -->|"extract syscalls.json from mode 2 output"| ENFORCE
     PARSE_PIN -->|"(func_name, partition_addr)"| ENFORCE
 ```
 
